@@ -42,6 +42,18 @@ SCALE = np.array([0.55, 0.35, 0.55, 0.35, 0.44, 0.44,
 GAIT_PERIOD = 0.6
 DECIMATION = 10           # 50 Hz at dt=0.002
 
+# Shared ONNX session: inference is stateless given obs, and ort releases the
+# GIL during run() — one session serves all env instances/threads. Cuts
+# per-env memory by the session+model size.
+_SHARED_SESSION = None
+
+
+def _get_session(path=ONNX_PATH):
+    global _SHARED_SESSION
+    if _SHARED_SESSION is None:
+        _SHARED_SESSION = ort.InferenceSession(path)
+    return _SHARED_SESSION
+
 # Joint index groups (29-DoF actuator order: legs 0-11, waist 12-14,
 # left arm 15-21, right arm 22-28)
 LEGS = slice(0, 12)
@@ -53,7 +65,7 @@ R_ARM = slice(22, 29)
 
 class LocoBase29:
     def __init__(self, onnx_path=ONNX_PATH):
-        self.sess = ort.InferenceSession(onnx_path)
+        self.sess = _get_session(onnx_path)
         self.inp = self.sess.get_inputs()[0].name
         self.action = np.zeros(29, dtype=np.float32)
         self.target = HOME.copy()

@@ -68,6 +68,7 @@ class G1PunchEnv(gym.Env):
 
     def __init__(self, max_steps=1000, randomize=True):
         super().__init__()
+        self.render_mode = None
         self.model = build_model(with_bag=True)
         self.data = mujoco.MjData(self.model)
         self.model.opt.timestep = DT
