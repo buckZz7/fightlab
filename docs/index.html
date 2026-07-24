@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIGHTLAB — Autonomous Robot Boxing</title>
+<meta name="description" content="Self-play boxing reinforcement learning for humanoid robots. MuJoCo sim today, Unitree G1 in the ring tomorrow.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --fg: #f2f0eb;
+    --red: #e8291c;
+    --dim: #8a8782;
+    --line: #262624;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--red); color: #fff; }
+
+  /* ---------- nav ---------- */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1.1rem 2rem;
+    background: linear-gradient(to bottom, rgba(10,10,10,.92), rgba(10,10,10,0));
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .8rem;
+  }
+  nav .logo { font-family: 'Archivo Black', sans-serif; font-size: 1rem; letter-spacing: .05em; color: var(--fg); text-decoration: none; }
+  nav .logo span { color: var(--red); }
+  nav a.gh { color: var(--dim); text-decoration: none; border: 1px solid var(--line); padding: .45rem .9rem; border-radius: 3px; transition: .2s; }
+  nav a.gh:hover { color: var(--fg); border-color: var(--red); }
+
+  /* ---------- hero ---------- */
+  header {
+    min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 6rem 2rem 3rem;
+    position: relative;
+  }
+  .hero-tag {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--red); font-size: .8rem; letter-spacing: .35em;
+    text-transform: uppercase; margin-bottom: 1.2rem;
+  }
+  h1 {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: clamp(3.4rem, 13vw, 11rem);
+    line-height: .88; text-transform: uppercase;
+    letter-spacing: -.01em;
+  }
+  h1 .row2 { color: transparent; -webkit-text-stroke: 2px var(--fg); display: block; }
+  h1 .row3 { color: var(--red); display: block; }
+  .hero-sub {
+    margin-top: 2rem; max-width: 34rem;
+    color: var(--dim); font-size: 1.05rem; line-height: 1.65;
+  }
+  .hero-sub b { color: var(--fg); font-weight: 500; }
+  .hero-cta { margin-top: 2.4rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+  .btn {
+    font-family: 'JetBrains Mono', monospace; font-size: .85rem;
+    text-decoration: none; padding: .9rem 1.6rem; border-radius: 3px;
+    transition: .2s;
+  }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-red:hover { background: #ff3526; transform: translateY(-2px); }
+  .btn-ghost { color: var(--fg); border: 1px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--red); color: var(--red); }
+  .scroll-hint {
+    position: absolute; bottom: 2rem; left: 2rem;
+    font-family: 'JetBrains Mono', monospace; font-size: .7rem;
+    color: var(--dim); letter-spacing: .3em; text-transform: uppercase;
+    animation: bob 2.4s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(8px); } }
+
+  /* ---------- ticker ---------- */
+  .ticker {
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    overflow: hidden; white-space: nowrap; padding: .8rem 0;
+    background: var(--red);
+  }
+  .ticker-inner {
+    display: inline-block;
+    font-family: 'Archivo Black', sans-serif; font-size: .95rem;
+    color: #fff; text-transform: uppercase; letter-spacing: .12em;
+    animation: tick 22s linear infinite;
+  }
+  @keyframes tick { to { transform: translateX(-50%); } }
+
+  /* ---------- sections ---------- */
+  section { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
+  .sec-label {
+    font-family: 'JetBrains Mono', monospace; color: var(--red);
+    font-size: .75rem; letter-spacing: .35em; text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+  h2 {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: clamp(2rem, 5.5vw, 3.6rem);
+    text-transform: uppercase; line-height: 1; margin-bottom: 2.5rem;
+  }
+
+  /* ---------- fight card / replay ---------- */
+  .fightcard {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;
+  }
+  @media (max-width: 800px) { .fightcard { grid-template-columns: 1fr; } }
+  .replay-frame {
+    border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+    position: relative;
+    box-shadow: 0 0 80px rgba(232,41,28,.12);
+  }
+  .replay-frame img, .replay-frame video { width: 100%; display: block; }
+  .replay-frame::after {
+    content: "LIVE FROM SIM";
+    position: absolute; top: .8rem; left: .8rem;
+    font-family: 'JetBrains Mono', monospace; font-size: .65rem;
+    color: #fff; background: var(--red); padding: .25rem .6rem;
+    border-radius: 2px; letter-spacing: .2em;
+  }
+  .stats { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .stat { background: var(--bg); padding: 1.3rem 1.5rem; display: flex; justify-content: space-between; align-items: baseline; }
+  .stat .k { font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--dim); text-transform: uppercase; letter-spacing: .15em; }
+  .stat .v { font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; color: var(--fg); }
+  .stat .v.red { color: var(--red); }
+
+  /* ---------- rules ---------- */
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .rule { background: var(--bg); padding: 2rem 1.6rem; transition: background .25s; }
+  .rule:hover { background: #111; }
+  .rule .num { font-family: 'Archivo Black', sans-serif; color: var(--red); font-size: 2.2rem; }
+  .rule h3 { font-family: 'Archivo Black', sans-serif; text-transform: uppercase; font-size: 1rem; margin: .8rem 0 .6rem; }
+  .rule p { color: var(--dim); font-size: .9rem; line-height: 1.6; }
+
+  /* ---------- hp bar demo ---------- */
+  .hp-wrap { margin-top: 3rem; font-family: 'JetBrains Mono', monospace; font-size: .75rem; }
+  .hp-row { display: flex; align-items: center; gap: 1rem; margin-bottom: .7rem; }
+  .hp-name { width: 5.5rem; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; }
+  .hp-bar { flex: 1; height: 14px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+  .hp-fill { height: 100%; background: var(--red); width: 0; transition: width 1.4s cubic-bezier(.2,.8,.2,1); }
+  .hp-val { width: 3rem; text-align: right; color: var(--fg); }
+
+  /* ---------- roadmap ---------- */
+  .road { border-left: 2px solid var(--line); margin-left: .5rem; }
+  .phase { padding: 0 0 3rem 2.2rem; position: relative; }
+  .phase::before {
+    content: ""; position: absolute; left: -8px; top: .3rem;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--bg); border: 2px solid var(--dim);
+  }
+  .phase.now::before { background: var(--red); border-color: var(--red); box-shadow: 0 0 16px rgba(232,41,28,.7); }
+  .phase .tag { font-family: 'JetBrains Mono', monospace; font-size: .7rem; color: var(--red); letter-spacing: .3em; text-transform: uppercase; }
+  .phase h3 { font-family: 'Archivo Black', sans-serif; text-transform: uppercase; font-size: 1.4rem; margin: .5rem 0 .7rem; }
+  .phase p { color: var(--dim); max-width: 40rem; line-height: 1.65; }
+  .phase p b { color: var(--fg); font-weight: 500; }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 3rem 2rem; text-align: center;
+    font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--dim);
+  }
+  footer a { color: var(--red); text-decoration: none; }
+  .bigfoot {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: clamp(2.5rem, 9vw, 7rem); text-transform: uppercase;
+    color: transparent; -webkit-text-stroke: 1.5px var(--line);
+    display: block; margin-bottom: 2rem; line-height: 1;
+    transition: .4s;
+  }
+  .bigfoot:hover { -webkit-text-stroke-color: var(--red); }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo" href="#">FIGHT<span>LAB</span></a>
+  <a class="gh" href="https://github.com/buckZz7/fightlab">GITHUB →</a>
+</nav>
+
+<header>
+  <div class="hero-tag">Self-play robot combat RL</div>
+  <h1>
+    <span class="row1">Two bots.</span>
+    <span class="row2">One ring.</span>
+    <span class="row3">No scripts.</span>
+  </h1>
+  <p class="hero-sub">
+    FightLab trains humanoid robots to box through <b>self-play reinforcement
+    learning</b> in MuJoCo. Raw joint torques in, contact-force damage out.
+    Balance under assault, punch accuracy, knockouts — all learned, none choreographed.
+    The endgame: <b>real autonomous robot boxing</b>.
+  </p>
+  <div class="hero-cta">
+    <a class="btn btn-red" href="https://github.com/buckZz7/fightlab">VIEW THE CODE</a>
+    <a class="btn btn-ghost" href="#rules">FIGHT RULES</a>
+  </div>
+  <div class="scroll-hint">▼ Scroll</div>
+</header>
+
+<div class="ticker"><div class="ticker-inner" id="ticker"></div></div>
+
+<section id="replay">
+  <div class="sec-label">01 / The Lab</div>
+  <h2>Trained, not<br>programmed</h2>
+  <div class="fightcard">
+    <div class="replay-frame">
+      <img src="../balance_replay.gif" alt="Balance policy replay — humanoid absorbing randomized pushes">
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">Milestone 1</span><span class="v">BALANCE</span></div>
+      <div class="stat"><span class="k">Push force</span><span class="v red">100–400 N</span></div>
+      <div class="stat"><span class="k">Action space</span><span class="v">17 torques</span></div>
+      <div class="stat"><span class="k">Torque limit</span><span class="v red">±50 N·m</span></div>
+      <div class="stat"><span class="k">Algorithm</span><span class="v">PPO ×16 envs</span></div>
+      <div class="stat"><span class="k">Physics</span><span class="v">MuJoCo RK4</span></div>
+    </div>
+  </div>
+  <p style="color:var(--dim); margin-top:1.5rem; font-size:.9rem;">
+    Replay: the balance policy absorbing random torso shoves. Fall = episode over.
+    This is the primitive that throwing — and taking — punches is built on.
+  </p>
+</section>
+
+<section id="rules">
+  <div class="sec-label">02 / Boxing v1</div>
+  <h2>Only score<br>what matters</h2>
+  <div class="rules">
+    <div class="rule"><div class="num">1</div><h3>Win by KO</h3><p>Put the opponent's torso on the canvas. Nothing else ends it early.</p></div>
+    <div class="rule"><div class="num">2</div><h3>Or win on HP</h3><p>Timer runs out, higher health pool takes the decision.</p></div>
+    <div class="rule"><div class="num">3</div><h3>Force = damage</h3><p>Fist-to-body contact force scales HP loss. Capped per hit, halved for love taps.</p></div>
+    <div class="rule"><div class="num">4</div><h3>No spam</h3><p>Damage cooldown between scoring hits. Slapping the body repeatedly scores nothing.</p></div>
+  </div>
+  <div class="hp-wrap">
+    <div class="hp-row"><span class="hp-name">BLUE</span><div class="hp-bar"><div class="hp-fill" data-hp="72"></div></div><span class="hp-val">72</span></div>
+    <div class="hp-row"><span class="hp-name">RED</span><div class="hp-bar"><div class="hp-fill" data-hp="34"></div></div><span class="hp-val">34</span></div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="sec-label">03 / Path to the ring</div>
+  <h2>Sim today.<br>Steel tomorrow.</h2>
+  <div class="road">
+    <div class="phase now">
+      <div class="tag">Phase 1 — Now</div>
+      <h3>Sim gauntlet</h3>
+      <p>Balance → punching → full self-play boxing with ELO-rated kings. <b>Domain randomization from day one</b>: mass, friction, and actuator gear jitter every episode, so policies can't overfit to perfect physics. Challenges run in CI; losers get a cooldown, kings get defended.</p>
+    </div>
+    <div class="phase">
+      <div class="tag">Phase 2</div>
+      <h3>One real robot</h3>
+      <p>Deploy the king's balance policy on a single <b>Unitree G1</b>. Sim2Real transfer is the whole ballgame — this is where the randomization budget pays off.</p>
+    </div>
+    <div class="phase">
+      <div class="tag">Phase 3</div>
+      <h3>Real bout</h3>
+      <p>Two robots, one ring, fully autonomous. <b>World-first learned robot boxing match.</b> Entertainment on the outside, contact-robustness benchmark on the inside.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a class="bigfoot" href="https://github.com/buckZz7/fightlab">FightLab</a>
+  Built by <a href="https://github.com/buckZz7">buckZz7</a> · MuJoCo · PPO · Self-play<br>
+  No humans were consulted during the punches.
+</footer>
+
+<script>
+  // ticker
+  const items = "KNOCKOUT OR NOTHING ✦ FORCE = DAMAGE ✦ SELF-PLAY ONLY ✦ SIM2REAL ✦ NO SCRIPTS ✦ ";
+  document.getElementById('ticker').textContent = items.repeat(4);
+
+  // hp bars animate on scroll
+  const fills = document.querySelectorAll('.hp-fill');
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) e.target.style.width = e.target.dataset.hp + '%';
+  }), { threshold: .5 });
+  fills.forEach(f => io.observe(f));
+</script>
+</body>
+</html>
