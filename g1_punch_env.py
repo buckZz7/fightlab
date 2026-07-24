@@ -142,13 +142,17 @@ class G1PunchEnv(gym.Env):
         residual = self._residual
         bag_vel_prev = abs(float(self.data.qvel[self.bag_dof]))
 
-        self.loco.update(self.data.qpos, self.data.qvel)
-        target = self.loco.target.copy()
-        target[SKILL_JOINTS] += residual
-        tau = self.loco.pd_torque(self.data.qpos, self.data.qvel,
-                                  target_override=target)
-        self.data.ctrl[:] = np.clip(tau, self.lo, self.hi)
         for _ in range(self.frame_skip):
+            # recompute PD torque every physics substep — the balance base
+            # drifts and falls within ~20 steps if torque is held stale for
+            # the full 10ms control period (found empirically: env fell at
+            # 21 steps with zero action; per-substep torque stands 1000+).
+            self.loco.update(self.data.qpos, self.data.qvel)
+            target = self.loco.target.copy()
+            target[SKILL_JOINTS] += residual
+            tau = self.loco.pd_torque(self.data.qpos, self.data.qvel,
+                                      target_override=target)
+            self.data.ctrl[:] = np.clip(tau, self.lo, self.hi)
             mujoco.mj_step(self.model, self.data, 1)
         self.step_count += 1
 
@@ -173,7 +177,8 @@ class G1PunchEnv(gym.Env):
         d_r = float(np.linalg.norm(bag_pos - fist_r))
         d_l = float(np.linalg.norm(bag_pos - fist_l))
         near = min(d_r, d_l)
-        r_approach = 0.5 * max(0.0, getattr(self, "_prev_near", near) - near)
+        prev = self._prev_near if self._prev_near is not None else near
+        r_approach = 0.5 * max(0.0, prev - near)
         self._prev_near = near
 
         # energy penalty
