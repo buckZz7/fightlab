@@ -128,6 +128,7 @@ class G1PunchEnv(gym.Env):
         self.loco.reset()
         self.step_count = 0
         self._residual = np.zeros(N_SKILL)
+        self._prev_near = None
         return self._get_obs(), {}
 
     def _pelvis_z(self):
@@ -153,18 +154,31 @@ class G1PunchEnv(gym.Env):
 
         # --- reward ---
         bag_vel = abs(float(self.data.qvel[self.bag_dof]))
-        # punch power: reward bag acceleration spikes (hits), not steady swing
         hit = max(0.0, bag_vel - bag_vel_prev)
         r_power = 10.0 * hit + 0.5 * max(0.0, bag_vel - 0.3)
-        # stability shaping: stay near HOME pose on legs, upright torso.
-        # (falling is heavily penalized by termination; shape against drift)
+
+        # survival: staying alive and upright is continuously rewarding —
+        # a fall must cost more than any single hit pays.
         z = self._pelvis_z()
         quat = self.data.qpos[3:7]
-        tilt = 1.0 - float(quat[0]) ** 2     # ~0 when upright
-        r_stab = -2.0 * tilt - 1.0 * max(0.0, 0.72 - z)
-        # energy penalty on residuals
+        tilt = 1.0 - float(quat[0]) ** 2
+        r_alive = 0.2 if z > 0.6 else 0.0
+        r_stab = -3.0 * tilt - 2.0 * max(0.0, 0.72 - z)
+
+        # approach shaping: reward the lead fist moving TOWARD the bag.
+        # Dense gradient so the policy finds contact without needing to lunge.
+        bag_pos = self.data.xpos[self.bag_body]
+        fist_r = self.data.geom_xpos[self.r_fist]
+        fist_l = self.data.geom_xpos[self.l_fist]
+        d_r = float(np.linalg.norm(bag_pos - fist_r))
+        d_l = float(np.linalg.norm(bag_pos - fist_l))
+        near = min(d_r, d_l)
+        r_approach = 0.5 * max(0.0, getattr(self, "_prev_near", near) - near)
+        self._prev_near = near
+
+        # energy penalty
         r_energy = -0.01 * float(np.sum(np.square(residual)))
-        reward = r_power + r_stab + r_energy
+        reward = r_power + r_alive + r_stab + r_approach + r_energy
 
         terminated = z < 0.4
         truncated = self.step_count >= self.max_steps
