@@ -29,6 +29,14 @@ class PunchEnv(BalanceEnv):
         dr_gear_jitter=0.10,        # +/-10% actuator gear
         **kwargs,
     ):
+        # Stripped obs layout differs from BalanceEnv's (body-count-dependent
+        # terms removed), so balance policies can't be transferred into this
+        # env directly — but observations are now stable across body additions.
+        # qpos/qvel for the humanoid are unaffected by the extra bag DOF.
+        kwargs.setdefault("include_cinert_in_observation", False)
+        kwargs.setdefault("include_cvel_in_observation", False)
+        kwargs.setdefault("include_qfrc_actuator_in_observation", False)
+        kwargs.setdefault("include_cfrc_ext_in_observation", False)
         super().__init__(**kwargs)
         self._target_distance = target_distance
         self._target_radius = target_radius
@@ -42,9 +50,20 @@ class PunchEnv(BalanceEnv):
         self._build_target()
 
     def _build_target(self):
-        """Add a heavy sphere on a fixed stand ahead of the humanoid."""
-        spec = self.model
-        # worldbody -> add stand (static pole) and bag (dynamic sphere with joint)
+        """Add a heavy sphere on a fixed stand ahead of the humanoid.
+
+        self.model is a compiled MjModel; edit via MjSpec and recompile.
+        The obs/action space is unchanged (humanoid joints only), so
+        policies trained on BalanceEnv transfer directly.
+        """
+        # Load the gymnasium humanoid XML and extend it with the target.
+        # BalanceEnv's model was compiled from this same file, so obs/action
+        # spaces match and balance policies transfer directly.
+        import os
+        import gymnasium.envs.mujoco as _gym_mj
+        xml_path = os.path.join(os.path.dirname(_gym_mj.__file__),
+                                "assets", "humanoid.xml")
+        spec = mujoco.MjSpec.from_file(xml_path)
         world = spec.worldbody
         stand = world.add_body(name="target_stand", pos=[self._target_distance, 0, 0.0])
         stand.add_geom(name="stand_pole", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
@@ -52,16 +71,25 @@ class PunchEnv(BalanceEnv):
                        rgba=[0.3, 0.3, 0.3, 1], contype=0, conaffinity=0)
         bag = stand.add_body(name="target_bag", pos=[0, 0, 1.45])
         bag.add_joint(name="bag_swing", type=mujoco.mjtJoint.mjJNT_SLIDE,
-                      axis=[1, 0, 0], range=[-0.6, 0.6], damping=8.0, springref=0.0,
+                      axis=[1, 0, 0], range=[-0.6, 0.6], damping=8.0,
                       stiffness=40.0)
         bag.add_geom(name="bag", type=mujoco.mjtGeom.mjGEOM_SPHERE,
                      size=[self._target_radius], mass=self._target_mass,
                      rgba=[0.8, 0.2, 0.2, 1])
-        self._rebuild()
-
-    def _rebuild(self):
-        """Recompile model+data after spec mutation, preserving training API."""
-        self.model = mujoco.MjModel.from_xml_string(self.model.to_xml_string() if hasattr(self.model, 'to_xml_string') else None) if False else self.model
+        self.model = spec.compile()
+        self.data = mujoco.MjData(self.model)
+        # Recompiled model has an extra DOF (bag slide joint); refresh
+        # cached initial state, action space, and observation space so the
+        # shapes gymnasium advertises match what _get_obs actually returns.
+        self.init_qpos = self.data.qpos.ravel().copy()
+        self.init_qvel = self.data.qvel.ravel().copy()
+        self._set_action_space()
+        # observation_space is just an attribute on MujocoEnv; rebuild it
+        # from a real observation vector.
+        import gymnasium.spaces as _spaces
+        obs_vec = self._get_obs()
+        self.observation_space = _spaces.Box(
+            low=-np.inf, high=np.inf, shape=obs_vec.shape, dtype=np.float64)
 
     # --- domain randomization ---
     def reset(self, *, seed=None, options=None):
@@ -87,35 +115,16 @@ class PunchEnv(BalanceEnv):
 
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
-        # punch damage: fist (hand bodies) contacting the bag at speed
+        # Damage proxy: bag swing speed above 1 m/s means a solid fist hit
+        # landed. Scales with impact speed.
         damage = 0.0
-        try:
-            bag_id = self.model.body("target_bag").id
-            for hand_name in ("hand1", "hand2"):
-                try:
-                    hand_id = self.model.body(hand_name).id
-                except KeyError:
-                    continue
-                for geom1 in range(self.model.ngeom):
-                    if self.model.geom_bodyid[geom1] != hand_id:
-                        continue
-                    for geom2 in range(self.model.ngeom):
-                        if self.model.geom_bodyid[geom2] != bag_id:
-                            continue
-                        contacts = mujoco.mj_contactForce  # placeholder, replaced below
-        except KeyError:
-            pass
-        # simpler & robust: check bag velocity change as damage proxy
-        try:
-            bag_jnt = self.model.joint("bag_swing").id
-            bag_vel = float(self.data.qvel[self.model.jnt_dofadr[bag_jnt]])
-            bag_speed = abs(bag_vel)
-            if bag_speed > 1.0:  # m/s swing speed = solid hit
-                damage = (bag_speed - 1.0) * 5.0
-                self.target_hp -= damage
-                reward += damage * 0.5
-        except KeyError:
-            pass
+        bag_jnt = self.model.joint("bag_swing").id
+        bag_vel = float(self.data.qvel[self.model.jnt_dofadr[bag_jnt]])
+        bag_speed = abs(bag_vel)
+        if bag_speed > 1.0:
+            damage = (bag_speed - 1.0) * 5.0
+            self.target_hp -= damage
+            reward += damage * 0.5
         info["target_hp"] = self.target_hp
         info["damage_dealt"] = damage
         return obs, reward, terminated, truncated, info
