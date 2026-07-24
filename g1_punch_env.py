@@ -159,18 +159,18 @@ class G1PunchEnv(gym.Env):
         # --- reward ---
         bag_vel = abs(float(self.data.qvel[self.bag_dof]))
         hit = max(0.0, bag_vel - bag_vel_prev)
-        r_power = 10.0 * hit + 0.5 * max(0.0, bag_vel - 0.3)
+        # hits pay big — must dominate the alternative of standing still
+        r_power = 30.0 * hit + 2.0 * max(0.0, bag_vel - 0.2)
 
-        # survival: staying alive and upright is continuously rewarding —
-        # a fall must cost more than any single hit pays.
+        # survival: small, so standing still is NOT the optimal strategy —
+        # balance is a constraint (via termination), not the objective.
         z = self._pelvis_z()
         quat = self.data.qpos[3:7]
         tilt = 1.0 - float(quat[0]) ** 2
-        r_alive = 0.2 if z > 0.6 else 0.0
+        r_alive = 0.05 if z > 0.6 else 0.0
         r_stab = -3.0 * tilt - 2.0 * max(0.0, 0.72 - z)
 
-        # approach shaping: reward the lead fist moving TOWARD the bag.
-        # Dense gradient so the policy finds contact without needing to lunge.
+        # approach shaping: strong dense gradient toward the bag.
         bag_pos = self.data.xpos[self.bag_body]
         fist_r = self.data.geom_xpos[self.r_fist]
         fist_l = self.data.geom_xpos[self.l_fist]
@@ -178,7 +178,7 @@ class G1PunchEnv(gym.Env):
         d_l = float(np.linalg.norm(bag_pos - fist_l))
         near = min(d_r, d_l)
         prev = self._prev_near if self._prev_near is not None else near
-        r_approach = 0.5 * max(0.0, prev - near)
+        r_approach = 3.0 * max(0.0, prev - near) + 0.5 * max(0.0, 0.35 - near)
         self._prev_near = near
 
         # energy penalty
