@@ -43,6 +43,10 @@ TORSO_BODY = "torso_link"
 # Total: 28 + 7 + 2 + 3 + 4 + 14 = 58
 OBS_DIM = 58
 
+# Action: 14 arm residuals + 3 walk commands (vx, vy, wz) = 17
+N_CMD = 3
+ACT_DIM = 17
+
 # HP
 MAX_HP = 100.0
 DAMAGE_PER_HIT = 15.0      # per unit contact force
@@ -88,14 +92,10 @@ class MocapOpponent:
         self._step_accum = 0.0
 
     def get_action(self):
-        """Returns 14-dim arm residual in [-1, 1] for current mocap frame."""
+        """Returns 17-dim action: [0:14] arm residual, [14:17] walk cmd (zeros)."""
         f = min(self.frame, self.T - 1)
 
-        # Build 14-dim residual from mocap arm targets
-        # The fight policy outputs residuals scaled by RESIDUAL_SCALE,
-        # so we need to produce targets that, when scaled, produce the
-        # mocap joint angles relative to HOME.
-        action = np.zeros(N_SKILL)
+        action = np.zeros(N_SKILL + N_CMD)
 
         # 14-dim action maps to 29dof joints [15:29] (L arm 15-21, R arm 22-28)
         for i, j29 in enumerate(range(15, 29)):
@@ -103,7 +103,6 @@ class MocapOpponent:
                 j23 = MOCAP_ARM_MAP[j29]
                 mocap_angle = self.dof[f, j23]
                 home_angle = HOME[j29]
-                # Residual = (target - home) / RESIDUAL_SCALE
                 residual = (mocap_angle - home_angle) / max(RESIDUAL_SCALE[i], 0.01)
                 action[i] = np.clip(residual, -1, 1)
 
@@ -153,7 +152,7 @@ class G1SelfPlayEnv(gym.Env):
         self.mocap_opp = MocapOpponent() if opponent_mocap else None
 
         # Action/obs spaces
-        self.action_space = spaces.Box(-1.0, 1.0, shape=(N_SKILL,), dtype=np.float64)
+        self.action_space = spaces.Box(-1.0, 1.0, shape=(ACT_DIM,), dtype=np.float64)
         self.observation_space = spaces.Box(-np.inf, np.inf, shape=(OBS_DIM,), dtype=np.float64)
 
         # State
@@ -283,20 +282,42 @@ class G1SelfPlayEnv(gym.Env):
         if self.mocap_opp is not None:
             return self.mocap_opp.get_action()
         if self.opponent is None:
-            return np.random.uniform(-1, 1, N_SKILL)
+            return np.zeros(ACT_DIM)  # random stands still (better than random noise)
         obs = self._get_obs(agent)
         a, _ = self.opponent.predict(obs, deterministic=True)
         return np.clip(a, -1, 1)
 
     def step(self, action):
-        """Step the arena. action = challenger (agent 0) arm residuals."""
+        """Step the arena. action = challenger (agent 0) 17-dim:
+        [0:14] = arm residuals, [14:17] = walk cmd (vx, vy, wz)
+        """
+        # Split action: arm residuals + walk commands
+        arm_action = np.clip(action[:N_SKILL], -1, 1)
+        walk_cmd = np.clip(action[N_SKILL:], -1, 1)
+        # Scale walk commands: vx in [-0.5, 0.5] m/s, vy [-0.3, 0.3], wz [-1, 1] rad/s
+        walk_scaled = walk_cmd * np.array([0.5, 0.3, 1.0])
+
         # Get opponent action
         opp_action = self._opp_action(1)
-        actions = [np.clip(action, -1, 1), opp_action]
+        if self.mocap_opp is not None:
+            opp_arm = opp_action
+            opp_walk = np.zeros(3)  # mocap opponent stands still
+        elif self.opponent is not None:
+            opp_arm = opp_action[:N_SKILL]
+            opp_walk = opp_action[N_SKILL:] * np.array([0.5, 0.3, 1.0])
+        else:
+            opp_arm = opp_action
+            opp_walk = np.zeros(3)
 
-        # Low-pass filter both agents' residuals
+        actions = [arm_action, opp_arm]
+
+        # Set walk commands on balance policies
+        self.loco[0].set_command(walk_scaled[0], walk_scaled[1], walk_scaled[2])
+        self.loco[1].set_command(opp_walk[0], opp_walk[1], opp_walk[2])
+
+        # Low-pass filter both agents' arm residuals
         for agent in range(2):
-            raw = actions[agent] * RESIDUAL_SCALE
+            raw = actions[agent][:N_SKILL] * RESIDUAL_SCALE
             self._residuals[agent] += 0.25 * (raw - self._residuals[agent])
 
         # Physics step loop (same as G1PunchEnv)
