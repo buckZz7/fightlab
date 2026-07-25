@@ -51,6 +51,10 @@ def build_model(with_bag=True):
     if with_bag:
         world = spec.worldbody
         stand = world.add_body(name="bag_stand", pos=[0.30, -0.12, 0.0])
+        # base plate: anchors the stand visually to the floor
+        stand.add_geom(name="stand_base", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                       size=[0.18, 0.02, 0], pos=[0, 0, 0.02],
+                       rgba=[0.15, 0.15, 0.15, 1], contype=0, conaffinity=0)
         stand.add_geom(name="stand_pole", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
                        size=[0.03, 0.5, 0], pos=[0, 0, 0.5],
                        rgba=[0.3, 0.3, 0.3, 1], contype=0, conaffinity=0)

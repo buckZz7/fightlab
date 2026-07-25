@@ -145,6 +145,7 @@ class G1MocapPunchEnv(gym.Env):
         self.loco.reset()
         self.step_count = 0
         self._residual = np.zeros(N_SKILL)
+        self._root_x0 = float(self.data.xpos[self.pelvis_id][0])
         return self._get_obs(), {}
 
     def _pelvis_z(self):
@@ -182,13 +183,18 @@ class G1MocapPunchEnv(gym.Env):
         imit_err = np.square(ref[IMIT_JOINTS_29] - cur[IMIT_JOINTS_29]).mean()
         r_imit = self.imit_weight * np.exp(-4.0 * imit_err)
 
+        # root-motion penalty: don't walk into the punch. Penalize pelvis
+        # x-translation from spawn so the policy learns to punch planted.
+        root_x = float(self.data.xpos[self.pelvis_id][0])
+        r_root = -3.0 * abs(root_x - self._root_x0)
+
         z = self._pelvis_z()
         quat = self.data.qpos[3:7]
         tilt = 1.0 - float(quat[0]) ** 2
         r_stab = -3.0 * tilt - 2.0 * max(0.0, 0.72 - z)
 
         r_energy = -0.01 * float(np.sum(np.square(residual)))
-        reward = r_bag + r_imit + r_stab + r_energy
+        reward = r_bag + r_imit + r_root + r_stab + r_energy
 
         terminated = z < 0.4
         truncated = self.step_count >= self.max_steps
