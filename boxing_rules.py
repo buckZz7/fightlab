@@ -207,15 +207,14 @@ def run_bout(env_factory, red_path, blue_path, rounds=ROUNDS,
     env = env_factory()
     judge = BoxingJudge(env, round_seconds=round_seconds, rounds=rounds)
     red = PPO.load(red_path, env=env)
-    blue = PPO.load(blue_path, env=env)
-    # Who fights whom: map 0->red, 1->blue in env agent indexing.
+    # blue policy is loaded inside env via opponent_model2 (bout mode)
     obs, _ = env.reset()
     done = False
     while not done:
-        # env agent 0 = red, agent 1 = blue (or vice versa; we score by winner)
+        # env is single-agent view: agent 0 = red (trained), agent 1 = blue
+        # (frozen opponent_model2). Pass red's action; env computes blue.
         a0 = red.predict(obs, deterministic=True)[0]
-        a1 = blue.predict(obs, deterministic=True)[0]
-        actions = np.stack([a0, a1], axis=0)
+        actions = a0
         obs, rew, term, trunc, info = judge.step(actions)
         done = term or trunc
     card = judge.card()
