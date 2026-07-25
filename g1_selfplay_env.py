@@ -478,69 +478,68 @@ class G1SelfPlayEnv(gym.Env):
         opp = 1 - agent
         reward = 0.0
 
-        # Damage dealt (positive) — weighted by punch quality
+        # Damage dealt (positive) — PRIMARY objective: land legal punches
         if (agent, opp) in self._contact_states:
             cs = self._contact_states[(agent, opp)]
-            if cs.get('shove', False):
-                # Shove: no reward (anti-shove mechanism)
-                pass
-            else:
-                reward += 5.0 * cs['damage']
+            if not cs.get('shove', False):
+                reward += 15.0 * cs['damage']   # dominant: striking must pay off
                 # Big hit bonus: clean fast punches
                 if cs['force'] > 50 and cs.get('punch_speed', 0) > 1.0:
-                    reward += 5.0  # quality strike bonus
+                    reward += 8.0  # quality strike bonus
                 elif cs['force'] > 50:
-                    reward += 2.0  # forceful contact
+                    reward += 3.0  # forceful contact
+            else:
+                # Shoving detected: small reward only, heavily discouraged
+                reward -= 2.0 * cs.get('damage', 0.0)
 
         # Damage taken (negative) — strong penalty for getting hit
         if (opp, agent) in self._contact_states:
             cs = self._contact_states[(opp, agent)]
             if not cs.get('shove', False):
-                reward -= 3.0 * cs['damage']  # defensive penalty
+                reward -= 4.0 * cs['damage']  # defensive penalty
 
-        # Stability: small alive bonus, big tilt penalty
-        z = self._pelvis_z(agent)
-        quat = self.data.qpos[QPOS_OFFSET[agent] + 3: QPOS_OFFSET[agent] + 7]
-        tilt = 1.0 - float(quat[0]) ** 2
-        reward += 0.05 if z > 0.6 else 0.0
-        reward -= 3.0 * tilt
-        reward -= 2.0 * max(0.0, 0.72 - z)
+            # Stability: small alive bonus, big tilt penalty
+            z = self._pelvis_z(agent)
+            quat = self.data.qpos[QPOS_OFFSET[agent] + 3: QPOS_OFFSET[agent] + 7]
+            tilt = 1.0 - float(quat[0]) ** 2
+            reward += 0.05 if z > 0.6 else 0.0
+            reward -= 3.0 * tilt
+            reward -= 2.0 * max(0.0, 0.72 - z)
 
-        # Facing penalty (w=10, doubled): must face opponent to score.
-        # Prevents back-attack / hold-down-from-behind degenerate behavior.
-        pelvis_quat = self.data.qpos[
-            QPOS_OFFSET[agent] + 3: QPOS_OFFSET[agent] + 7
-        ]
-        pw, px, py, pz = pelvis_quat
-        forward = np.array([
-            1 - 2*(py*py + pz*pz),
-            2*(px*py + pw*pz),
-            2*(px*pz - pw*py),
-        ])
-        my_pos = self.data.xpos[self.pelvis_id[agent]]
-        opp_pos = self.data.xpos[self.pelvis_id[opp]]
-        to_opp = opp_pos - my_pos
-        to_opp_norm = np.linalg.norm(to_opp)
-        facing = 0.0
-        if to_opp_norm > 1e-6:
-            to_opp /= to_opp_norm
-            facing = float(np.dot(forward, to_opp))
-            # Strong penalty for not facing opponent
-            if facing < 0:
-                reward += 10.0 * facing  # -10 when fully turned away
-            elif facing < 0.5:
-                reward += 5.0 * (facing - 0.5)  # -2.5 at 0 facing
+            # Facing penalty: must face opponent to score (Son & Kwon 2023).
+            # Moderate weight — enough to prevent back-attacks, not so much the
+            # policy refuses to engage.
+            pelvis_quat = self.data.qpos[
+                QPOS_OFFSET[agent] + 3: QPOS_OFFSET[agent] + 7
+            ]
+            pw, px, py, pz = pelvis_quat
+            forward = np.array([
+                1 - 2*(py*py + pz*pz),
+                2*(px*py + pw*pz),
+                2*(px*pz - pw*py),
+            ])
+            my_pos = self.data.xpos[self.pelvis_id[agent]]
+            opp_pos = self.data.xpos[self.pelvis_id[opp]]
+            to_opp = opp_pos - my_pos
+            to_opp_norm = np.linalg.norm(to_opp)
+            facing = 0.0
+            if to_opp_norm > 1e-6:
+                to_opp /= to_opp_norm
+                facing = float(np.dot(forward, to_opp))
+                # Moderate penalty for not facing opponent
+                if facing < 0:
+                    reward += 3.0 * facing  # -3 when fully turned away
+                elif facing < 0.3:
+                    reward += 2.0 * (facing - 0.3)  # mild at low facing
 
-        # Approach maintenance: reward staying close to opponent
-        # and penalize running away
-        dist = to_opp_norm if to_opp_norm > 1e-6 else 0
-        if facing > 0 and dist < 0.5:
-            reward += 1.0  # engaged bonus
-        if facing > 0 and dist < 0.2:
-            reward += 1.0  # close quarters bonus
-        # Distance-based approach (only when facing)
-        if facing > 0:
-            reward += 0.5 * max(0.0, 1.0 - dist)
+            # Approach maintenance: reward staying close to opponent
+            # and penalize running away. Subordinate to hitting.
+            dist = to_opp_norm if to_opp_norm > 1e-6 else 0
+            if facing > 0 and dist < 0.4:
+                reward += 0.5  # engaged bonus (small)
+            # Distance-based approach (only when facing) — modest shaping
+            if facing > 0:
+                reward += 0.2 * max(0.0, 1.0 - dist)
 
         # Energy penalty
         reward -= 0.01 * float(np.sum(np.square(self._residuals[agent])))
