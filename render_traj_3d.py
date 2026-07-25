@@ -12,7 +12,7 @@ import numpy as np
 from g1_mocap_punch_env import build_model
 
 
-def render(traj_path, out, width=1280, height=720, fps=30):
+def render(traj_path, out, width=640, height=360, fps=30):
     z = np.load(traj_path, allow_pickle=True)
     qpos_frames = z["qpos"]
     infos = list(z["infos"])

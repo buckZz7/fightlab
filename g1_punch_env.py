@@ -51,19 +51,34 @@ def build_model(with_bag=True):
     if with_bag:
         world = spec.worldbody
         stand = world.add_body(name="bag_stand", pos=[0.30, -0.12, 0.0])
-        # base plate: anchors the stand visually to the floor
-        stand.add_geom(name="stand_base", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
-                       size=[0.18, 0.02, 0], pos=[0, 0, 0.02],
-                       rgba=[0.15, 0.15, 0.15, 1], contype=0, conaffinity=0)
-        stand.add_geom(name="stand_pole", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
-                       size=[0.03, 0.5, 0], pos=[0, 0, 0.5],
+        # Gantry frame (outdoor/garage bag rig): two posts + crossbar, bag
+        # hangs from the crossbar on a strap. No ceiling needed, nothing for
+        # the bag to visually detach from when it swings.
+        for dy in (-0.35, 0.35):
+            # low-profile feet
+            stand.add_geom(name=f"foot_{dy}", type=mujoco.mjtGeom.mjGEOM_BOX,
+                           size=[0.20, 0.06, 0.02], pos=[0, dy, 0.02],
+                           rgba=[0.35, 0.35, 0.35, 1], contype=0, conaffinity=0)
+            stand.add_geom(name=f"post_{dy}", type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+                           size=[0.03, 0.75, 0], pos=[0, dy, 0.75],
+                           rgba=[0.3, 0.3, 0.3, 1], contype=0, conaffinity=0)
+        # crossbar spanning the posts at z=1.5
+        stand.add_geom(name="crossbar", type=mujoco.mjtGeom.mjGEOM_CAPSULE,
+                       size=[0.025, 0.35, 0], pos=[0, 0, 1.5],
+                       quat=[0.7071, 0, 0.7071, 0],
                        rgba=[0.3, 0.3, 0.3, 1], contype=0, conaffinity=0)
-        bag = stand.add_body(name="heavy_bag", pos=[0, 0, 1.0])
+        bag = stand.add_body(name="heavy_bag", pos=[0, 0, 1.1])
         bag.add_joint(name="bag_swing", type=mujoco.mjtJoint.mjJNT_SLIDE,
                       axis=[1, 0, 0], range=[-0.6, 0.6], damping=8.0,
                       stiffness=40.0)
-        bag.add_geom(name="bag", type=mujoco.mjtGeom.mjGEOM_SPHERE,
-                     size=[0.12], mass=20.0, rgba=[0.8, 0.2, 0.2, 1])
+        # strap: connects crossbar (1.5) down into the bag top — moves with
+        # the bag body so the bag never looks detached mid-swing.
+        bag.add_geom(name="bag_strap", type=mujoco.mjtGeom.mjGEOM_CAPSULE,
+                     size=[0.015, 0.22, 0], pos=[0, 0, 0.22],
+                     rgba=[0.2, 0.2, 0.2, 1], contype=0, conaffinity=0)
+        # heavy bag: capsule (real bag silhouette), not a sphere
+        bag.add_geom(name="bag", type=mujoco.mjtGeom.mjGEOM_CAPSULE,
+                     size=[0.12, 0.18, 0], mass=20.0, rgba=[0.8, 0.2, 0.2, 1])
     return spec.compile()
 
 

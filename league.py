@@ -27,6 +27,11 @@ CROWN_THRESHOLD = 0.60      # challenger must win >= 60% of matches
 ELO_K = 32
 START_ELO = 1000.0
 
+# Challenge rate-limit (starts lenient, tighten only if variance-farming
+# appears in practice): escalating cooldown on consecutive failed challenges.
+# 1st fail: 24h, 2nd: 3d, 3rd+: 7d. Resets on a successful crown.
+COOLDOWN_LADDER_H = [24, 72, 168]
+
 
 def load_kings():
     if not os.path.exists(KINGS_FILE):
