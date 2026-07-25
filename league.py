@@ -20,7 +20,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from eval_fight import series
+from boxing_rules import run_bout
 
 KINGS_FILE = os.path.join(os.path.dirname(__file__), "models", "kings.jsonl")
 CROWN_THRESHOLD = 0.60      # challenger must win >= 60% of matches
@@ -95,9 +95,26 @@ def cmd_challenge(challenger_path, matches):
     print(f"vs king gen{king['gen']} {king['path']} (ELO {king['elo']:.1f})")
     print(f"Series: {matches} matches, need >= {CROWN_THRESHOLD:.0%} to take the crown\n")
 
-    # challenger = red, king = blue
-    res = series(challenger_path, king["path"], matches=matches)
-    print(json.dumps(res, indent=2))
+    # challenger = red, king = blue. Run boxing-rules bout(s).
+    from g1_selfplay_env import make_g1_selfplay_env
+    red_wins = 0
+    blue_wins = 0
+    cards = []
+    for m in range(matches):
+        res = run_bout(
+            lambda: make_g1_selfplay_env(opponent_path2=king["path"], randomize=False),
+            challenger_path, king["path"],
+        )
+        cards.append(res)
+        if res["red_wins"] > 0:
+            red_wins += 1
+        else:
+            blue_wins += 1
+    res = {"red_wins": red_wins, "blue_wins": blue_wins, "draws": 0,
+           "cards": cards}
+    print(json.dumps({k: v for k, v in res.items() if k != "cards"}, indent=2))
+    print("\nSample card (match 0):")
+    print(json.dumps(cards[0]["card"], indent=2))
 
     win_rate = res["red_wins"] / matches
     e = expected(king["elo"], king["elo"])  # prior: equal
@@ -129,22 +146,35 @@ def cmd_gauntlet(path, matches=10):
         sys.exit("no kings yet.")
     opponents = [kings[0]] + kings[-2:] if len(kings) > 2 else kings
     seen, card = set(), []
+    from g1_selfplay_env import make_g1_selfplay_env
     for k in opponents:
         if k["path"] in seen:
             continue
         seen.add(k["path"])
-        res = series(path, k["path"], matches=matches)
+        wins = 0; losses = 0; kos = 0
+        for _ in range(matches):
+            res = run_bout(
+                lambda: make_g1_selfplay_env(opponent_path2=k["path"], randomize=False),
+                path, k["path"],
+            )
+            if res["red_wins"] > 0:
+                wins += 1
+            else:
+                losses += 1
+            if res.get("method") in ("KO", "TKO"):
+                kos += 1
+        ko_rate = kos / matches
         card.append({
             "opponent": k["path"],
             "opponent_gen": k["gen"],
             "opponent_elo": k["elo"],
-            "wins": res["red_wins"],
-            "losses": res["blue_wins"],
-            "draws": res["draws"],
-            "ko_rate": res["ko_rate"],
+            "wins": wins,
+            "losses": losses,
+            "draws": 0,
+            "ko_rate": ko_rate,
         })
         print(f"vs gen{k['gen']} (ELO {k['elo']:.0f}): "
-              f"{res['red_wins']}W-{res['blue_wins']}L-{res['draws']}D, KO rate {res['ko_rate']:.0%}")
+              f"{wins}W-{losses}L, KO rate {ko_rate:.0%}")
     out = {"model": path, "card": card}
     print(json.dumps(out, indent=2))
 

@@ -123,7 +123,7 @@ class G1SelfPlayEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, opponent_model=None, opponent_mocap=False,
+    def __init__(self, opponent_model=None, opponent_model2=None, opponent_mocap=False,
                  max_steps=2000, randomize=True):
         super().__init__()
         self.model = build_arena()
@@ -148,7 +148,8 @@ class G1SelfPlayEnv(gym.Env):
         self.loco = [LocoBase29(), LocoBase29()]
 
         # Opponent: neural net, mocap replay, or random
-        self.opponent = opponent_model  # SB3 model or None
+        self.opponent = opponent_model  # SB3 model or None (agent 1 frozen)
+        self.opponent2 = opponent_model2  # SB3 model for agent 1 when both RL (bout)
         self.mocap_opp = MocapOpponent() if opponent_mocap else None
 
         # Action/obs spaces
@@ -278,9 +279,17 @@ class G1SelfPlayEnv(gym.Env):
         return float(self.data.xpos[self.pelvis_id[agent]][2])
 
     def _opp_action(self, agent):
-        """Get action for the opponent (agent 1)."""
+        """Get action for the opponent (agent 1).
+
+        If opponent2 is set, agent 1 is also RL-controlled (true bout mode):
+        it uses its own policy with agent=1 observation.
+        """
         if self.mocap_opp is not None:
             return self.mocap_opp.get_action()
+        if self.opponent2 is not None and agent == 1:
+            obs = self._get_obs(1)
+            a, _ = self.opponent2.predict(obs, deterministic=True)
+            return np.clip(a, -1, 1)
         if self.opponent is None:
             return np.zeros(ACT_DIM)  # random stands still (better than random noise)
         obs = self._get_obs(agent)
@@ -550,7 +559,8 @@ class G1SelfPlayEnv(gym.Env):
         return reward
 
 
-def make_g1_selfplay_env(opponent_path=None, **kw):
+def make_g1_selfplay_env(opponent_path=None, opponent_path2=None, **kw):
     from stable_baselines3 import PPO
     opp = PPO.load(opponent_path) if opponent_path else None
-    return G1SelfPlayEnv(opponent_model=opp, **kw)
+    opp2 = PPO.load(opponent_path2) if opponent_path2 else None
+    return G1SelfPlayEnv(opponent_model=opp, opponent_model2=opp2, **kw)
