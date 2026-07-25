@@ -59,9 +59,10 @@ def train(timesteps, out, opponent_path=None, opponent_mocap=False,
     )
 
     ckpt = CheckpointCallback(
-        save_freq=max(timesteps // 10, 10000),
+        save_freq=40000 if timesteps >= 40000 else 10000,
         save_path=f"{out}_ckpt",
         name_prefix="boxing",
+        verbose=1,
     )
 
     opp_name = "mocap" if opponent_mocap else (os.path.basename(opponent_path) if opponent_path else "random")

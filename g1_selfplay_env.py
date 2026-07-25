@@ -506,9 +506,8 @@ class G1SelfPlayEnv(gym.Env):
         reward -= 3.0 * tilt
         reward -= 2.0 * max(0.0, 0.72 - z)
 
-        # Facing penalty (Son & Kwon, w=10): must face opponent to
-        # score. Prevents back-attack / hold-down-from-behind degenerate
-        # behavior.
+        # Facing penalty (w=10, doubled): must face opponent to score.
+        # Prevents back-attack / hold-down-from-behind degenerate behavior.
         pelvis_quat = self.data.qpos[
             QPOS_OFFSET[agent] + 3: QPOS_OFFSET[agent] + 7
         ]
@@ -526,11 +525,20 @@ class G1SelfPlayEnv(gym.Env):
         if to_opp_norm > 1e-6:
             to_opp /= to_opp_norm
             facing = float(np.dot(forward, to_opp))
+            # Strong penalty for not facing opponent
             if facing < 0:
-                reward += 2.0 * facing  # penalty for not facing opponent
+                reward += 10.0 * facing  # -10 when fully turned away
+            elif facing < 0.5:
+                reward += 5.0 * (facing - 0.5)  # -2.5 at 0 facing
 
-        # Approach: reward closing distance to opponent (only if facing)
+        # Approach maintenance: reward staying close to opponent
+        # and penalize running away
         dist = to_opp_norm if to_opp_norm > 1e-6 else 0
+        if facing > 0 and dist < 0.5:
+            reward += 1.0  # engaged bonus
+        if facing > 0 and dist < 0.2:
+            reward += 1.0  # close quarters bonus
+        # Distance-based approach (only when facing)
         if facing > 0:
             reward += 0.5 * max(0.0, 1.0 - dist)
 
