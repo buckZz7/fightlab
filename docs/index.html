@@ -214,20 +214,22 @@
   <h2>Trained, not<br>programmed</h2>
   <div class="fightcard">
     <div class="replay-frame">
-      <img src="../balance_replay.gif" alt="Balance policy replay — humanoid absorbing randomized pushes">
+      <video src="punch_3d.mp4" autoplay loop muted playsinline
+             alt="G1 humanoid throwing a mocap-guided punch at a heavy bag — trained with PPO, frozen whole-body balance base"></video>
     </div>
     <div class="stats">
-      <div class="stat"><span class="k">Milestone 1</span><span class="v">BALANCE</span></div>
-      <div class="stat"><span class="k">Push force</span><span class="v red">100–400 N</span></div>
-      <div class="stat"><span class="k">Action space</span><span class="v">17 torques</span></div>
-      <div class="stat"><span class="k">Torque limit</span><span class="v red">±50 N·m</span></div>
-      <div class="stat"><span class="k">Algorithm</span><span class="v">PPO ×16 envs</span></div>
-      <div class="stat"><span class="k">Physics</span><span class="v">MuJoCo RK4</span></div>
+      <div class="stat"><span class="k">Milestone</span><span class="v">PUNCH</span></div>
+      <div class="stat"><span class="k">Bag velocity</span><span class="v red">0.72 m/s</span></div>
+      <div class="stat"><span class="k">Hit rate</span><span class="v">10 / 10</span></div>
+      <div class="stat"><span class="k">Falls</span><span class="v red">0 / 10</span></div>
+      <div class="stat"><span class="k">Method</span><span class="v">Mocap + PPO</span></div>
+      <div class="stat"><span class="k">Robot</span><span class="v">Unitree G1</span></div>
     </div>
   </div>
   <p style="color:var(--dim); margin-top:1.5rem; font-size:.9rem;">
-    Replay: the balance policy absorbing random torso shoves. Fall = episode over.
-    This is the primitive that throwing — and taking — punches is built on.
+    A real punch, learned. The G1 tracks a human mocap reference for form while a
+    PPO policy adapts for bag damage — on top of a frozen whole-body balance base
+    that keeps it on its feet through every strike. No choreography, no teleop.
   </p>
 </section>
 
