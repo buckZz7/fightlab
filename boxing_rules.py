@@ -112,7 +112,7 @@ class BoxingJudge:
         obs, rew, term, trunc, info = self.env.step(actions)
 
         # Round clock
-        self.round_time += self.env.model.opt.timestep * self.env.FRAME_SKIP
+        self.round_time += self.env.model.opt.timestep * self.env.frame_skip
 
         # Foul detection (simplified)
         for a in range(2):
