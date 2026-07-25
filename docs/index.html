@@ -196,9 +196,10 @@
   </h1>
   <p class="hero-sub">
     FightLab trains humanoid robots to box through <b>self-play reinforcement
-    learning</b> in MuJoCo. Raw joint torques in, contact-force damage out.
-    Balance under assault, punch accuracy, knockouts — all learned, none choreographed.
-    The endgame: <b>real autonomous robot boxing</b>.
+    learning</b> in MuJoCo. Frozen balance base keeps them upright, learned
+    arm residuals throw the punches. Contact-force damage, HP bars, KOs —
+    all learned, none choreographed. The endgame: <b>real autonomous robot
+    boxing</b>.
   </p>
   <div class="hero-cta">
     <a class="btn btn-red" href="https://github.com/buckZz7/fightlab">VIEW THE CODE</a>
@@ -237,9 +238,9 @@
   <div class="sec-label">02 / Boxing v1</div>
   <h2>Only score<br>what matters</h2>
   <div class="rules">
-    <div class="rule"><div class="num">1</div><h3>Win by KO</h3><p>Put the opponent's torso on the canvas. Nothing else ends it early.</p></div>
+    <div class="rule"><div class="num">1</div><h3>Win by KO</h3><p>Put the opponent down. Pelvis below 0.4m, fight's over.</p></div>
     <div class="rule"><div class="num">2</div><h3>Or win on HP</h3><p>Timer runs out, higher health pool takes the decision.</p></div>
-    <div class="rule"><div class="num">3</div><h3>Force = damage</h3><p>Fist-to-body contact force scales HP loss. Capped per hit, halved for love taps.</p></div>
+    <div class="rule"><div class="num">3</div><h3>Force = damage</h3><p>Fist-to-body contact force scales HP loss. Capped per hit, light brush contacts ignored.</p></div>
     <div class="rule"><div class="num">4</div><h3>No spam</h3><p>Damage cooldown between scoring hits. Slapping the body repeatedly scores nothing.</p></div>
   </div>
   <div class="hp-wrap">

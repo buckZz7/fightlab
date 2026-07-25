@@ -1,72 +1,107 @@
 # FightLab
 
-Self-play boxing reinforcement learning for humanoid robots.
+Self-play boxing reinforcement learning for the Unitree G1 humanoid.
 
-Two humanoids in a MuJoCo arena. Each controls joint torques for shoulders, elbows, hips, knees, and neck. Damage comes from fist-to-body contact force. The goal: learn to fight, then transfer to real hardware.
+Two G1 robots in a MuJoCo arena. Each is driven by a frozen whole-body
+balance policy (keeps them upright) plus a learned arm-residual fight
+policy (throws punches, blocks, approaches). Damage comes from
+fist-to-body contact force. The goal: learn to fight in sim, then
+transfer to real hardware.
 
-![Balance replay](balance_replay.gif)
+![Punch preview](punch_3d.mp4)
 
-## Why
+## Architecture
 
-Robot combat is entertainment on the outside and a contact-robustness benchmark on the inside. A policy that can throw punches, absorb hits, and stay upright under domain randomization is the same policy that survives real-world actuator noise, friction variation, and impacts. Sim2Real transfer is the prize.
+```
+Frozen balance base (ONNX)    Learned fight layer (PPO)
+─────────────────────────     ─────────────────────────
+unitree_rl_mjlab              14-dim arm residuals
+29-DoF velocity policy        added on top of base targets
+keeps robot upright           trained via self-play
+```
 
-## Environments
+The balance policy (LocoBase29) is a pretrained whole-body locomotion
+controller from unitree_rl_mjlab, exported as ONNX. It runs at 50 Hz
+and produces PD torque targets for all 29 joints. The fight policy
+outputs 14-dimensional arm residuals (7 per arm) that are added to
+the base policy's arm targets. Legs and waist stay frozen — overriding
+them breaks balance (validated empirically).
 
-| Env | File | Milestone |
+## Pipeline
+
+| Stage | File | Status |
 |---|---|---|
-| `BalanceEnv` | `envs.py` | Stay upright while shoved at random times, directions, and magnitudes (100–400 N torso impulses). The primitive everything else is built on. |
-| `PunchEnv` | `punch_env.py` | Balance + a 20 kg heavy-bag target at jab range. Reward = standing + damage dealt. Domain randomization baked in: ±10% torso mass, ±15% floor friction, ±10% actuator gear per episode. |
-| `BoxingEnv` | `boxing_env.py` | Full two-agent self-play boxing. HP-based damage from fist contact force, knockdown termination, damage cooldown to prevent hit-spam. |
+| Balance base | `loco_base29.py` | Done — stands 30s+, 30% arm sweep tolerance |
+| Bag punch | `g1_punch_env.py` + `train_g1_punch.py` | Done — 0 falls, 0.67 m/s bag velocity |
+| Mocap punch | `g1_mocap_punch_env.py` + `train_g1_mocap_punch.py` | Done — 0.72 m/s, 10/10 hits, 0 falls |
+| Self-play boxing | `g1_arena.py` + `g1_selfplay_env.py` | Built — env runs, training next |
+| Fight eval | `eval_fight_g1.py` | Built — 1v1 eval works |
+| League | `league.py` | Needs porting to G1 env |
 
-## Rules (boxing v1)
+## Boxing rules (v1)
 
-Only score what matters.
-
-- **Win by KO:** opponent's torso stays down
+- **Win by KO:** opponent's pelvis drops below 0.4m
 - **Otherwise:** higher HP when the round timer ends
-- **Damage:** scales with fist contact force, capped per hit, halved for weak contact
-- **Anti-spam:** damage cooldown between scoring hits
-- **Actions:** raw joint torques, clipped to ±50 N·m
-- **Observations:** own joint state, opponent pose, contact forces, both HP values
-
-## Trained checkpoints
-
-`models/` contains PPO checkpoints from the balance milestone:
-
-- `balance_ppo2.zip` — current balance policy
-- `smoke.zip` — early smoke-test run
+- **Damage:** fist-to-torso contact force, capped per hit, cooldown to prevent hit-spam
+- **Actions:** 14 arm joint residuals in [-1, 1]
+- **Observations:** own joint state, torso orientation, HP, opponent pose + arm positions (58-dim)
 
 ## Usage
 
 ```bash
-pip install mujoco gymnasium stable-baselines3 imageio matplotlib
+# Environment
+pip install mujoco gymnasium stable-baselines3 onnxruntime imageio
 
-# Train the balance baseline (16 parallel envs)
-python train_balance.py --timesteps 1000000 --out models/balance_ppo
+# Train the mocap punch policy (bag striking)
+python train_g1_mocap_punch.py --timesteps 800000 --out models/g1_mocap_punch
 
-# Evaluate a policy: push survival stats
-python eval_balance.py --model models/balance_ppo2.zip --episodes 20
+# Train self-play boxing (vs random opponent)
+python train_g1_selfplay.py --timesteps 1000000 --out models/boxing_gen1
 
-# Hard mode: more frequent, harder pushes
-python eval_balance.py --model models/balance_ppo2.zip --hard
+# Evaluate two policies in a 1v1 bout
+python eval_fight_g1.py --red models/boxing_gen1.zip --blue random --matches 20
 
-# Render a replay video (software-rendered stick figure, no GL needed)
-python eval_balance.py --model models/balance_ppo2.zip --video replay.mp4
+# Render a fight video
+python eval_fight_g1.py --red models/boxing_gen1.zip --blue random --video fight.mp4
 ```
 
-## Roadmap
+## Rendering
 
-- **Phase 1 — Sim (now):** balance → punching → self-play boxing with ELO-rated kings. Domain randomization and actuator limits in the env from day one.
-- **Phase 2 — One real robot:** deploy the king's balance policy on a single Unitree G1.
-- **Phase 3 — Real bout:** two-robot autonomous boxing match.
+Local software rendering via OSMesa (no GPU needed):
+
+```bash
+export LD_LIBRARY_PATH=/opt/data/osmesa_lib/usr/lib/x86_64-linux-gnu
+export MUJOCO_GL=osmesa
+```
+
+Dump a trajectory (CPU) then render (CPU or GPU):
+
+```bash
+python dump_traj.py --model models/g1_mocap_punch.zip --out traj.npz --seconds 12
+python render_traj_3d.py --traj traj.npz --out punch_3d.mp4
+```
 
 ## Repo layout
 
 ```
-boxing_env.py      Two-agent boxing arena (MuJoCo XML + env logic)
-envs.py            BalanceEnv: humanoid + randomized torso pushes
-punch_env.py       PunchEnv: BalanceEnv + strike target + domain randomization
-train_balance.py   PPO training entry point
-eval_balance.py    Evaluation + replay rendering
-models/            Trained PPO checkpoints
+loco_base29.py            Frozen ONNX balance policy (29-DoF)
+g1_punch_env.py           Bag striking env (frozen base + arm residuals)
+g1_mocap_punch_env.py     Mocap-imitation punch env (DeepMimic-style)
+g1_arena.py               Two-G1 boxing arena builder
+g1_selfplay_env.py        Self-play boxing env (PPO training target)
+eval_fight_g1.py          1v1 fight evaluation + video render
+league.py                 King-of-the-hill league (ELO, lineage)
+dump_traj.py              Trajectory dumper for rendering
+render_traj_3d.py         Trajectory to 3D video renderer
+train_g1_punch.py         Bag punch PPO trainer
+train_g1_mocap_punch.py   Mocap punch PPO trainer
+mocap/                    Retargeted boxing mocap clips
+models/                   Trained PPO checkpoints
+docs/                     GitHub Pages site
 ```
+
+## Roadmap
+
+- **Phase 1 — Sim (now):** balance → bag punch → mocap punch → self-play boxing with ELO-rated kings. Domain randomization from day one.
+- **Phase 2 — One real robot:** deploy the king's balance policy on a single Unitree G1.
+- **Phase 3 — Real bout:** two-robot autonomous boxing match.
