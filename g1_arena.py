@@ -105,7 +105,7 @@ def build_arena():
     )
     r2_body = r2['worldbody'].replace(
         'pos="0 0 0.793"',
-        'pos="0.6 0 0.793"'  # no rotation — both face forward
+        'pos="0.3 0 0.793"'  # close enough for punches to reach
     )
 
     combined = f"""<mujoco model="g1_boxing_arena">

@@ -24,6 +24,7 @@ import joblib
 
 from g1_arena import build_arena, SKILL_JOINTS, N_SKILL, N_QPOS, N_QVEL, DT, FRAME_SKIP, RESIDUAL_SCALE
 from loco_base29 import LocoBase29, HOME
+from loco_base29_rot import LocoBase29Rot
 
 # Per-agent qpos/qvel slice offsets in the combined model
 # Robot 1: qpos[0:36], qvel[0:35]
@@ -144,7 +145,7 @@ class G1SelfPlayEnv(gym.Env):
         self._base_mass = self.model.body_mass.copy()
         self._base_friction = self.model.geom_friction.copy()
 
-        # Balance policies (one per robot)
+        # Balance policies (one per robot, both forward-facing)
         self.loco = [LocoBase29(), LocoBase29()]
 
         # Opponent: neural net, mocap replay, or random
@@ -181,8 +182,10 @@ class G1SelfPlayEnv(gym.Env):
         # Torso subtree body IDs — hardcoded list of body names that are
         # valid punch targets (torso + head + arms). Static list avoids the
         # O(nbody * depth) parent walk that was hanging __init__.
+        # Valid punch targets: torso + head + arms (full upper body)
         TORSO_SUBTREE_NAMES = [
             TORSO_BODY,  # torso_link
+            "head_link",  # head (if it exists as separate body)
             "left_shoulder_pitch_link", "left_shoulder_roll_link",
             "left_shoulder_yaw_link", "left_elbow_link",
             "left_wrist_roll_link", "left_wrist_pitch_link",
@@ -246,11 +249,11 @@ class G1SelfPlayEnv(gym.Env):
             self.data.qpos[off + 2] = 0.75          # pelvis height
             self.data.qpos[off + 7: off + 36] = HOME
             self.data.qpos[off + 7: off + 36] += self.np_random.uniform(-0.02, 0.02, 29)
-            # Face each other: robot 2 placed on opposite side, no rotation
-            # (the balance policy can't handle a 180° Z flip; the fight
-            # policy learns to approach from any direction).
-            if agent == 1:
-                pass  # no rotation — both face forward
+            # Both robots face forward (no rotation). The balance policy
+            # can't handle a 180° rotation. The fight policy learns to
+            # approach and strike from any angle — the mocap opponent's
+            # arms still punch forward, which is fine for warmup.
+            # Robots placed at 0.3m apart so punches can reach.
 
         if self.randomize:
             self.model.body_mass[:] = self._base_mass * self.np_random.uniform(
@@ -377,11 +380,12 @@ class G1SelfPlayEnv(gym.Env):
 
                     if hit_registered:
                         # Anti-shove: compute relative fist velocity
-                        # v_rel = v_fist - v_torso_attacker, projected onto
-                        # attack direction (toward opponent)
-                        fist_vel = self.data.geom_xvelp[fist].copy()
+                        # v_rel = v_fist_body - v_torso_attacker, projected
+                        # onto attack direction (toward opponent)
+                        fist_body_id = self.model.geom_bodyid[fist]
+                        fist_vel = self.data.cvel[fist_body_id][3:6].copy()
                         torso_id = self.torso_id[attacker]
-                        torso_vel = self.data.xvelp[torso_id].copy()
+                        torso_vel = self.data.cvel[torso_id][3:6].copy()
                         rel_vel = fist_vel - torso_vel
 
                         # Attack direction: from attacker torso toward defender torso
