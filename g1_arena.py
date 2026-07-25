@@ -10,7 +10,10 @@ import re
 import mujoco
 import numpy as np
 
-G1_SCENE_XML = "/opt/data/unitree_mujoco/unitree_robots/g1/scene_29dof.xml"
+import os
+G1_SCENE_XML = os.environ.get(
+    "G1_SCENE_XML",
+    "/opt/data/unitree_mujoco/unitree_robots/g1/scene_29dof.xml")
 
 # Joint indices (29-DoF actuator order: legs 0-11, waist 12-14, arm 15-28)
 SKILL_JOINTS = list(range(15, 29))  # arms only — fight policy controls these
@@ -60,6 +63,9 @@ def _prefix_xml(xml, prefix):
 
 def build_arena():
     """Build a two-G1 boxing arena model with fist collision spheres."""
+    MESH_DIR = os.environ.get(
+        "G1_MESH_DIR",
+        "/opt/data/unitree_mujoco/unitree_robots/g1/meshes")
     # Load G1 scene XML and add fist collision geoms
     spec = mujoco.MjSpec.from_file(G1_SCENE_XML)
     for side in ("left", "right"):
@@ -109,7 +115,7 @@ def build_arena():
     )
 
     combined = f"""<mujoco model="g1_boxing_arena">
-  <compiler angle="radian" meshdir="/opt/data/unitree_mujoco/unitree_robots/g1/meshes" autolimits="true"/>
+  <compiler angle="radian" meshdir="{MESH_DIR}" autolimits="true"/>
   <option integrator="RK4" timestep="{DT}" gravity="0 0 -9.81"/>
 
   <default>

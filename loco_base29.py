@@ -17,7 +17,10 @@ either (a) write residuals on the arm entries of the target vector, or
 import numpy as np
 import onnxruntime as ort
 
-ONNX_PATH = "/opt/data/unitree_rl_mjlab/deploy/robots/g1/config/policy/velocity/v0/exported/policy.onnx"
+import os
+ONNX_PATH = os.environ.get(
+    "G1_ONNX_PATH",
+    "/opt/data/unitree_rl_mjlab/deploy/robots/g1/config/policy/velocity/v0/exported/policy.onnx")
 
 KP = np.array([40.2, 99.1, 40.2, 99.1, 28.5, 28.5,
                40.2, 99.1, 40.2, 99.1, 28.5, 28.5,
