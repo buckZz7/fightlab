@@ -148,12 +148,12 @@ class BoxingJudge:
             if self.round >= self.rounds:
                 self._decide_decision()
                 info['decision'] = True
-                return obs, rew, True, info
+                return obs, rew, True, False, info
             # reset positions for next round (keep HP)
             info['round_end'] = self.round
 
         done = term or trunc or self.ko or self.dq is not None
-        return obs, rew, done, info
+        return obs, rew, term, trunc, info
 
     def _score_round(self):
         """10-point must system: round winner gets 10, loser 9 (or less)."""
