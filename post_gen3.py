@@ -39,9 +39,16 @@ def main():
     # 2. Render the title bout (gen3 challenger vs gen2 king)
     run(f"python render_bout.py {MODEL} {KING} --out gen3_title_bout.mp4 "
         f"--rounds 3 --round-seconds 30 --max-steps 2000")
-    # 3. Status
+    # 3. Export kings.jsonl -> docs/kings.json for the website
+    run("python -c \"import json; "
+        "ks=[json.loads(l) for l in open('models/kings.jsonl') if l.strip()]; "
+        "json.dump(ks, open('docs/kings.json','w'), indent=2)\"")
+    # 4. Stage bout video + kings.json into docs/ for GitHub Pages
+    run("cp gen3_title_bout.mp4 docs/gen3_title_bout.mp4")
+    run("cp models/kings.jsonl docs/kings.json")
+    # 5. Status
     run("python league.py status")
-    print("DONE. Pull gen3_title_bout.mp4 and models/kings.jsonl")
+    print("DONE. gen3_title_bout.mp4 + kings.json in docs/ ready to commit + push.")
 
 if __name__ == "__main__":
     main()

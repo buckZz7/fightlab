@@ -234,14 +234,39 @@
   </p>
 </section>
 
+<section id="bout">
+  <div class="sec-label">02 / King of the Hill</div>
+  <h2>Two bots.<br>One ring.</h2>
+  <div class="fightcard">
+    <div class="replay-frame">
+      <video src="gen3_title_bout.mp4" autoplay loop muted playsinline
+             alt="Two Unitree G1 humanoids boxing under FightLab rules — learned punching policy vs reigning king"></video>
+    </div>
+    <div class="stats" id="koth-card">
+      <div class="stat"><span class="k">Reigning king</span><span class="v" id="koth-king">—</span></div>
+      <div class="stat"><span class="k">ELO</span><span class="v red" id="koth-elo">—</span></div>
+      <div class="stat"><span class="k">Last bout</span><span class="v" id="koth-method">—</span></div>
+      <div class="stat"><span class="k">Mode</span><span class="v">Boxing v1 (no kicks)</span></div>
+      <div class="stat"><span class="k">Robots</span><span class="v">Unitree G1 ×2</span></div>
+      <div class="stat"><span class="k">Engine</span><span class="v">Learned + frozen base</span></div>
+    </div>
+  </div>
+  <p style="color:var(--dim); margin-top:1.5rem; font-size:.9rem;">
+    Autonomous boxing under real rules: 3 rounds, 10-point must scoring, fouls
+    and DQs, KO/TKO/decision wins. Every new generation challenges the reigning
+    king in CI — winners get crowned, losers get a cooldown. No teleop, no
+    choreography.
+  </p>
+</section>
+
 <section id="rules">
-  <div class="sec-label">02 / Boxing v1</div>
+  <div class="sec-label">03 / Boxing v1</div>
   <h2>Only score<br>what matters</h2>
   <div class="rules">
     <div class="rule"><div class="num">1</div><h3>Win by KO</h3><p>Put the opponent down. Pelvis below 0.4m, fight's over.</p></div>
-    <div class="rule"><div class="num">2</div><h3>Or win on HP</h3><p>Timer runs out, higher health pool takes the decision.</p></div>
+    <div class="rule"><div class="num">2</div><h3>Or win on points</h3><p>3 rounds, 10-point must. More clean damage wins the decision.</p></div>
     <div class="rule"><div class="num">3</div><h3>Force = damage</h3><p>Fist-to-body contact force scales HP loss. Capped per hit, light brush contacts ignored.</p></div>
-    <div class="rule"><div class="num">4</div><h3>No spam</h3><p>Damage cooldown between scoring hits. Slapping the body repeatedly scores nothing.</p></div>
+    <div class="rule"><div class="num">4</div><h3>No spam, no fouls</h3><p>Damage cooldown between scoring hits. Non-fist contact, shoving, and clinching are fouls — DQ at 4 points.</p></div>
   </div>
   <div class="hp-wrap">
     <div class="hp-row"><span class="hp-name">BLUE</span><div class="hp-bar"><div class="hp-fill" data-hp="72"></div></div><span class="hp-val">72</span></div>
@@ -279,7 +304,7 @@
 
 <script>
   // ticker
-  const items = "KNOCKOUT OR NOTHING ✦ FORCE = DAMAGE ✦ SELF-PLAY ONLY ✦ SIM2REAL ✦ NO SCRIPTS ✦ ";
+  const items = "KNOCKOUT OR NOTHING ✦ FORCE = DAMAGE ✦ SELF-PLAY ONLY ✦ SIM2REAL ✦ NO SCRIPTS ✦ KING OF THE HILL ✦ ";
   document.getElementById('ticker').textContent = items.repeat(4);
 
   // hp bars animate on scroll
@@ -288,6 +313,16 @@
     if (e.isIntersecting) e.target.style.width = e.target.dataset.hp + '%';
   }), { threshold: .5 });
   fills.forEach(f => io.observe(f));
+
+  // King of the Hill card: load kings.json (exported from models/kings.jsonl)
+  fetch('kings.json').then(r => r.ok ? r.json() : []).then(kings => {
+    if (!kings.length) return;
+    const k = kings[kings.length - 1];
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('koth-king', 'gen' + k.gen);
+    set('koth-elo', k.elo != null ? k.elo.toFixed(1) : '—');
+    set('koth-method', k.cause || '—');
+  }).catch(() => {});
 </script>
 </body>
 </html>
