@@ -20,6 +20,7 @@ import mujoco
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
+import joblib
 
 from g1_arena import build_arena, SKILL_JOINTS, N_SKILL, N_QPOS, N_QVEL, DT, FRAME_SKIP, RESIDUAL_SCALE
 from loco_base29 import LocoBase29, HOME
@@ -47,6 +48,72 @@ DAMAGE_PER_HIT = 15.0      # per unit contact force
 DAMAGE_COOLDOWN = 0.3      # seconds between scoring hits (anti-spam)
 DAMAGE_CAP_PER_HIT = 25.0  # max HP lost in one hit
 
+# Mocap 23-DoF -> G1 29-DoF arm joint mapping (from g1_mocap_punch_env)
+# Only arm joints: 23dof L arm 13-17 -> 29dof 15,16,17,18,20
+#                  23dof R arm 18-22 -> 29dof 22,23,24,25,27
+MOCAP_ARM_MAP = {
+    15: 13, 16: 14, 17: 15, 18: 16, 20: 17,   # left arm (29dof -> 23dof)
+    22: 18, 23: 19, 24: 20, 25: 21, 27: 22,   # right arm
+}
+# 29dof arm joints that have mocap data (10 of 14)
+MOCAP_JOINTS_29 = sorted(MOCAP_ARM_MAP.keys())
+# The 4 arm joints NOT in mocap (wrist pitch+yaw): 19,21,26,28
+
+
+class MocapOpponent:
+    """Replays mocap boxing arm trajectories as opponent actions.
+
+    This is the RoboStriker warmup stage: a standing opponent that throws
+    real boxing punches (from retargeted mocap), giving the fight policy
+    something meaningful to dodge, block, and counter.
+
+    Not a neural network — just a looped replay of mocap arm targets
+    converted to 14-dim residual space.
+    """
+
+    def __init__(self, mocap_path="mocap/kungfu_retargeted/Horse-stance_punch.pkl"):
+        d = joblib.load(mocap_path)
+        clip = d[list(d.keys())[0]]
+        self.dof = clip["dof"]      # (T, 23) retargeted joint angles
+        self.fps = int(clip["fps"])  # 30
+        self.T = len(self.dof)
+        self.frame = 0
+        # Control runs at 50Hz, mocap at 30fps -> advance frame every ~1.67 steps
+        self._frame_every = 50.0 / self.fps  # 1.67
+        self._step_accum = 0.0
+
+    def reset(self):
+        self.frame = 0
+        self._step_accum = 0.0
+
+    def get_action(self):
+        """Returns 14-dim arm residual in [-1, 1] for current mocap frame."""
+        f = min(self.frame, self.T - 1)
+
+        # Build 14-dim residual from mocap arm targets
+        # The fight policy outputs residuals scaled by RESIDUAL_SCALE,
+        # so we need to produce targets that, when scaled, produce the
+        # mocap joint angles relative to HOME.
+        action = np.zeros(N_SKILL)
+
+        # 14-dim action maps to 29dof joints [15:29] (L arm 15-21, R arm 22-28)
+        for i, j29 in enumerate(range(15, 29)):
+            if j29 in MOCAP_ARM_MAP:
+                j23 = MOCAP_ARM_MAP[j29]
+                mocap_angle = self.dof[f, j23]
+                home_angle = HOME[j29]
+                # Residual = (target - home) / RESIDUAL_SCALE
+                residual = (mocap_angle - home_angle) / max(RESIDUAL_SCALE[i], 0.01)
+                action[i] = np.clip(residual, -1, 1)
+
+        # Advance frame
+        self._step_accum += 1.0
+        if self._step_accum >= self._frame_every:
+            self.frame = (self.frame + 1) % self.T  # loop
+            self._step_accum = 0.0
+
+        return action
+
 
 class G1SelfPlayEnv(gym.Env):
     """Single-agent view of the G1 boxing arena for PPO training.
@@ -56,7 +123,8 @@ class G1SelfPlayEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, opponent_model=None, max_steps=2000, randomize=True):
+    def __init__(self, opponent_model=None, opponent_mocap=False,
+                 max_steps=2000, randomize=True):
         super().__init__()
         self.model = build_arena()
         self.data = mujoco.MjData(self.model)
@@ -79,8 +147,9 @@ class G1SelfPlayEnv(gym.Env):
         # Balance policies (one per robot)
         self.loco = [LocoBase29(), LocoBase29()]
 
-        # Opponent policy (SB3 model or None for random)
-        self.opponent = opponent_model
+        # Opponent: neural net, mocap replay, or random
+        self.opponent = opponent_model  # SB3 model or None
+        self.mocap_opp = MocapOpponent() if opponent_mocap else None
 
         # Action/obs spaces
         self.action_space = spaces.Box(-1.0, 1.0, shape=(N_SKILL,), dtype=np.float64)
@@ -192,6 +261,8 @@ class G1SelfPlayEnv(gym.Env):
         mujoco.mj_forward(self.model, self.data)
         for loco in self.loco:
             loco.reset()
+        if self.mocap_opp is not None:
+            self.mocap_opp.reset()
 
         self.step_count = 0
         self.hp = [MAX_HP, MAX_HP]
@@ -206,6 +277,8 @@ class G1SelfPlayEnv(gym.Env):
 
     def _opp_action(self, agent):
         """Get action for the opponent (agent 1)."""
+        if self.mocap_opp is not None:
+            return self.mocap_opp.get_action()
         if self.opponent is None:
             return np.random.uniform(-1, 1, N_SKILL)
         obs = self._get_obs(agent)
@@ -271,7 +344,13 @@ class G1SelfPlayEnv(gym.Env):
         return self._get_obs(0), reward, terminated, truncated, info
 
     def _update_damage(self):
-        """Detect fist-to-opponent-torso contacts and apply HP damage."""
+        """Detect fist-to-opponent-torso contacts and apply HP damage.
+
+        Anti-shove: a hit only scores if the fist has positive relative
+        velocity toward the opponent (RoboStriker's hit reward condition).
+        Shoving (body translation, zero relative fist velocity) scores zero.
+        Also requires facing the opponent (facing penalty, Son & Kwon 2023).
+        """
         for con in range(self.data.ncon):
             contact = self.data.contact[con]
             g1, g2 = contact.geom1, contact.geom2
@@ -286,45 +365,113 @@ class G1SelfPlayEnv(gym.Env):
             b1 = self.model.geom_bodyid[g1]
             b2 = self.model.geom_bodyid[g2]
 
-            # Check if one geom is a fist and the other is in the
-            # opponent's torso subtree (body ID match)
             for attacker in range(2):
                 defender = 1 - attacker
                 for fist in self.fist_geoms[attacker]:
                     fist_body = self.model.geom_bodyid[fist]
+                    hit_registered = False
                     if g1 == fist and b2 in self.torso_bodies[defender]:
-                        self._register_hit(attacker, defender, force)
+                        hit_registered = True
                     elif g2 == fist and b1 in self.torso_bodies[defender]:
-                        self._register_hit(attacker, defender, force)
+                        hit_registered = True
 
-    def _register_hit(self, attacker, defender, force):
-        """Record a hit with cooldown and HP damage."""
+                    if hit_registered:
+                        # Anti-shove: compute relative fist velocity
+                        # v_rel = v_fist - v_torso_attacker, projected onto
+                        # attack direction (toward opponent)
+                        fist_vel = self.data.geom_xvelp[fist].copy()
+                        torso_id = self.torso_id[attacker]
+                        torso_vel = self.data.xvelp[torso_id].copy()
+                        rel_vel = fist_vel - torso_vel
+
+                        # Attack direction: from attacker torso toward defender torso
+                        attack_dir = (
+                            self.data.xpos[self.torso_id[defender]] -
+                            self.data.xpos[torso_id]
+                        )
+                        attack_norm = np.linalg.norm(attack_dir)
+                        if attack_norm > 1e-6:
+                            attack_dir /= attack_norm
+
+                        # Relative velocity projected onto attack direction
+                        punch_speed = float(np.dot(rel_vel, attack_dir))
+
+                        # Facing check: are the robots facing each other?
+                        # Use pelvis forward direction (x-axis of pelvis frame)
+                        pelvis_quat = self.data.qpos[
+                            QPOS_OFFSET[attacker] + 3: QPOS_OFFSET[attacker] + 7
+                        ]
+                        # Pelvis forward = rotate [1,0,0] by pelvis quaternion
+                        pw, px, py, pz = pelvis_quat
+                        forward = np.array([
+                            1 - 2*(py*py + pz*pz),
+                            2*(px*py + pw*pz),
+                            2*(px*pz - pw*py),
+                        ])
+                        facing = float(np.dot(forward, attack_dir))
+
+                        # Hit only scores if:
+                        # 1. Punch speed > 0.5 m/s (fist moving toward opponent)
+                        # 2. Facing > 0 (roughly facing opponent)
+                        # 3. Force > 5N (already checked above)
+                        if punch_speed > 0.5 and facing > 0:
+                            self._register_hit(
+                                attacker, defender, force, punch_speed)
+                        elif punch_speed <= 0.5:
+                            # Shove: record but don't score (for logging)
+                            self._contact_states[(attacker, defender)] = {
+                                'force': force, 'damage': 0.0,
+                                'punch_speed': punch_speed,
+                                'shove': True}
+
+    def _register_hit(self, attacker, defender, force, punch_speed=0.0):
+        """Record a hit with cooldown and HP damage.
+
+        Damage scales with both force AND punch speed — a fast, clean
+        punch hurts more than a slow push.
+        """
         t = self.step_count * DT * FRAME_SKIP
         if t - self._last_hit_time[attacker] > DAMAGE_COOLDOWN:
+            # Damage = force * speed bonus (fast punches do more damage)
+            speed_mult = min(2.0, 1.0 + punch_speed * 0.5)
             dmg = min(DAMAGE_CAP_PER_HIT,
-                      force * DAMAGE_PER_HIT / 100.0)
+                      force * DAMAGE_PER_HIT / 100.0 * speed_mult)
             self.hp[defender] = max(0, self.hp[defender] - dmg)
             self._last_hit_time[attacker] = t
             self._contact_states[(attacker, defender)] = {
-                'force': force, 'damage': dmg}
+                'force': force, 'damage': dmg,
+                'punch_speed': punch_speed, 'shove': False}
 
     def _compute_reward(self, agent):
-        """Reward for the given agent."""
+        """Reward for the given agent.
+
+        Based on RoboStriker + Son&Kwon reward design:
+        - Hit reward requires relative fist velocity (anti-shove)
+        - Facing penalty prevents back-attack degenerate mode
+        - Punch speed weighted: fast clean punches score more
+        """
         opp = 1 - agent
         reward = 0.0
 
-        # Damage dealt (positive)
+        # Damage dealt (positive) — weighted by punch quality
         if (agent, opp) in self._contact_states:
             cs = self._contact_states[(agent, opp)]
-            reward += 5.0 * cs['damage']
-            # Big hit bonus
-            if cs['force'] > 50:
-                reward += 3.0
+            if cs.get('shove', False):
+                # Shove: no reward (anti-shove mechanism)
+                pass
+            else:
+                reward += 5.0 * cs['damage']
+                # Big hit bonus: clean fast punches
+                if cs['force'] > 50 and cs.get('punch_speed', 0) > 1.0:
+                    reward += 5.0  # quality strike bonus
+                elif cs['force'] > 50:
+                    reward += 2.0  # forceful contact
 
-        # Damage taken (negative)
+        # Damage taken (negative) — strong penalty for getting hit
         if (opp, agent) in self._contact_states:
             cs = self._contact_states[(opp, agent)]
-            reward -= 2.0 * cs['damage']
+            if not cs.get('shove', False):
+                reward -= 3.0 * cs['damage']  # defensive penalty
 
         # Stability: small alive bonus, big tilt penalty
         z = self._pelvis_z(agent)
@@ -334,11 +481,33 @@ class G1SelfPlayEnv(gym.Env):
         reward -= 3.0 * tilt
         reward -= 2.0 * max(0.0, 0.72 - z)
 
-        # Approach: reward closing distance to opponent
+        # Facing penalty (Son & Kwon, w=10): must face opponent to
+        # score. Prevents back-attack / hold-down-from-behind degenerate
+        # behavior.
+        pelvis_quat = self.data.qpos[
+            QPOS_OFFSET[agent] + 3: QPOS_OFFSET[agent] + 7
+        ]
+        pw, px, py, pz = pelvis_quat
+        forward = np.array([
+            1 - 2*(py*py + pz*pz),
+            2*(px*py + pw*pz),
+            2*(px*pz - pw*py),
+        ])
         my_pos = self.data.xpos[self.pelvis_id[agent]]
         opp_pos = self.data.xpos[self.pelvis_id[opp]]
-        dist = np.linalg.norm(opp_pos - my_pos)
-        reward += 0.5 * max(0.0, 1.0 - dist)  # closer = better
+        to_opp = opp_pos - my_pos
+        to_opp_norm = np.linalg.norm(to_opp)
+        facing = 0.0
+        if to_opp_norm > 1e-6:
+            to_opp /= to_opp_norm
+            facing = float(np.dot(forward, to_opp))
+            if facing < 0:
+                reward += 2.0 * facing  # penalty for not facing opponent
+
+        # Approach: reward closing distance to opponent (only if facing)
+        dist = to_opp_norm if to_opp_norm > 1e-6 else 0
+        if facing > 0:
+            reward += 0.5 * max(0.0, 1.0 - dist)
 
         # Energy penalty
         reward -= 0.01 * float(np.sum(np.square(self._residuals[agent])))
