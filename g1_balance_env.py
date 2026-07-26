@@ -77,11 +77,11 @@ class G1BalanceEnv(gym.Env):
 
     def _place(self):
         mujoco.mj_resetData(self.model, self.data)
-        for ai, x in enumerate(NATIVE_ROOT_X):
-            off = ai * 36            # each robot = 7 (root) + 29 (joints) = 36 qpos
-            self.data.qpos[off: off + 3] = [x, 0, STAND_Z]
-            # robot joints at qpos[off+7 : off+36]
-            self.data.qpos[off + 7: off + 36] = self.base[:29]  # HOME joints (29)
+        # SINGLE robot (r1). NATIVE_ROOT_X[0] = -0.6.
+        off = 0
+        self.data.qpos[off: off + 3] = [NATIVE_ROOT_X[0], 0, STAND_Z]
+        # robot joints at qpos[off+7 : off+36]
+        self.data.qpos[off + 7: off + 36] = self.base[:29]  # HOME joints (29)
         if self.randomize:
             self._randomize()
         mujoco.mj_forward(self.model, self.data)

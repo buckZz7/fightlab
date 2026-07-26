@@ -1,10 +1,8 @@
 """G1 two-robot boxing arena builder.
 
-Builds a MuJoCo model with two G1 humanoids facing each other by loading
-the G1 spec and duplicating all bodies/joints/actuators with name prefixes.
-
-Uses the compiled-model string approach: load G1 scene XML, prefix all
-named references, combine two copies offset on the X axis facing each other.
+Builds a MuJoCo model with two G1 humanoids facing each other by
+loading the G1 robot XML, duplicating all bodies/joints/actuators
+with name prefixes, and combining two copies offset on the X axis.
 
 Ring options (build_arena(ring=...)):
   'ropes' (default) -> regulation SOFT square ring: 4 padded corner
@@ -12,20 +10,31 @@ Ring options (build_arena(ring=...)):
         non-elastic contacts (solref 0.06/1, solimp 0.9/0.95/0.001).
         Bots can lean/corner into ropes and get pushed back, but can't
         walk through. This is the realistic boxing-ring behavior.
-  'walls'  -> old hard invisible walls (terminate-on-touch feel).
+  'walls' -> old hard invisible walls (terminate-on-touch feel).
   'open'   -> no boundary (infinite space).
+
+NOTE on MuJoCo version: this builds the final XML STRING directly
+(string manipulation on g1_29dof.xml) and calls
+MjModel.from_xml_string(). It does NOT use MjSpec/MjModel.to_xml()
+(regex section extraction), which is broken in MuJoCo 3.2.x.
 """
 import re
-import mujoco
-import numpy as np
-
 import os
+import numpy as np
+import mujoco
+
 G1_SCENE_XML = os.environ.get(
     "G1_SCENE_XML",
     "/opt/data/unitree_mujoco/unitree_robots/g1/scene_29dof.xml")
+# The scene file INCLUDES g1_29dof.xml -- read the real robot directly.
+G1_ROBOT_XML = os.path.join(
+    os.path.dirname(G1_SCENE_XML), "g1_29dof.xml")
+MESH_DIR = os.environ.get(
+    "G1_MESH_DIR",
+    "/opt/data/unitree_mujoco/unitree_robots/g1/meshes")
 
 # Joint indices (29-DoF actuator order: legs 0-11, waist 12-14, arm 15-28)
-SKILL_JOINTS = list(range(15, 29))  # arms only — fight policy controls these
+SKILL_JOINTS = list(range(15, 29))  # arms only -- fight policy controls these
 N_SKILL = 14
 N_QPOS = 36   # 7 freejoint + 29 joints
 N_QVEL = 35   # 6 freejoint + 29 joints
@@ -43,20 +52,50 @@ def _prefix_xml(xml, prefix):
     mesh_refs = set(re.findall(r'mesh="([^"]+)"', xml))
     mat_refs = set(re.findall(r'material="([^"]+)"', xml))
     all_refs = names | mesh_refs | mat_refs
-
     all_refs.discard("floor")
-
     for ref in sorted(all_refs, key=len, reverse=True):
         xml = xml.replace(f'name="{ref}"', f'name="{prefix}{ref}"')
         xml = xml.replace(f'mesh="{ref}"', f'mesh="{prefix}{ref}"')
         xml = xml.replace(f'material="{ref}"', f'material="{prefix}{ref}"')
-
     joint_refs = set(re.findall(r'joint="([^"]+)"', xml))
     joint_refs.discard("")
     for ref in sorted(joint_refs, key=len, reverse=True):
         xml = xml.replace(f'joint="{ref}"', f'joint="{prefix}{ref}"')
-
+    # drop any floor geom in the robot body (arena adds its own floor)
     xml = re.sub(r'<geom[^>]*name="(?:r1_|r2_)?floor"[^>]*/>', '', xml)
+    return xml
+
+
+def _strip_mujoco_wrapper(xml):
+    """Remove the outer <mujoco>...</mujoco> tag, keep inner content.
+
+    The robot file is a full <mujoco model=...> doc; embedding it
+    inline would nest <mujoco> inside <worldbody> (schema error).
+    """
+    m = re.search(r'<mujoco[^>]*>(.*)</mujoco>', xml, re.DOTALL)
+    return m.group(1) if m else xml
+
+
+def _add_fist_geoms(xml):
+    """Insert fist collision spheres on the wrist_yaw_link bodies."""
+    fists = ""
+    for side in ("left", "right"):
+        fists += (
+            f'<geom name="{side}_fist_col" type="sphere" '
+            f'class="wrist_motor" '
+            f'pos="0.05 0 0" size="0.06" mass="0.3" '
+            f'rgba="1 0 0 0.5" contype="1" conaffinity="1"/>'
+        )
+    # Insert fists right after each wrist_yaw_link body opening tag.
+    # The robot XML has <body name="..._wrist_yaw_link" ...>. We insert
+    # the fist geom as the first child.
+    def _insert(m):
+        return m.group(0) + fists
+    # match each wrist_yaw_link body start; insert fists once (left+right)
+    # by replacing the FIRST wrist_yaw_link occurrence with both fists.
+    xml = re.sub(
+        r'(<body[^>]*name="left_wrist_yaw_link"[^>]*>)',
+        lambda m: m.group(1) + fists, xml, count=1)
     return xml
 
 
@@ -73,11 +112,12 @@ def _ring_geoms(ring, half):
     if ring == "open":
         return ""
     if ring == "walls":
-        return """
-    <geom name="wall_n" type="box" pos="0 2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
-    <geom name="wall_s" type="box" pos="0 -2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
-    <geom name="wall_e" type="box" pos="2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
-    <geom name="wall_w" type="box" pos="-2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>"""
+        return (
+            '<geom name="wall_n" type="box" pos="0 2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>'
+            '<geom name="wall_s" type="box" pos="0 -2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>'
+            '<geom name="wall_e" type="box" pos="2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>'
+            '<geom name="wall_w" type="box" pos="-2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>'
+        )
     # 'ropes' (default): 4 padded corner posts (hard) + 4 rope levels (soft)
     h = half
     g = []
@@ -111,8 +151,6 @@ def _ring_geoms(ring, half):
             f'size="{ROPE_DIA/2} {h} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
     # Hard invisible backstop just outside ropes (anti-tunnel at speed).
-    # Ropes give the compliant catch + visual; backstop guarantees
-    # containment so a fast bot can't pass through the thin rope.
     bs = 0.07
     g.append(
         f'<geom name="stop_n" type="box" pos="0 {h+bs} 0.9" size="{h} 0.02 0.9" '
@@ -137,45 +175,35 @@ def build_arena(ring="ropes", half=2.4):
           Default 2.4 (4.8m, min pro) for fight density; tunable
           knob - widening is a cheap warm-start fine-tune, ropes transfer.
     """
-    MESH_DIR = os.environ.get(
-        "G1_MESH_DIR",
-        "/opt/data/unitree_mujoco/unitree_robots/g1/meshes")
-    # Load G1 scene XML and add fist collision geoms
-    spec = mujoco.MjSpec.from_file(G1_SCENE_XML)
-    for side in ("left", "right"):
-        wrist = next(b for b in spec.bodies
-                     if b.name == f"{side}_wrist_yaw_link")
-        wrist.add_geom(
-            name=f"{side}_fist_col", type=mujoco.mjtGeom.mjGEOM_SPHERE,
-            size=[0.06], pos=[0.05, 0, 0], mass=0.3,
-            rgba=[1, 0, 0, 0.5], contype=1, conaffinity=1)
-    xml = spec.to_xml()
+    # Read the real G1 robot XML directly (scene includes it).
+    with open(G1_ROBOT_XML) as f:
+        robot_xml = f.read()
+    # The robot file is a full <mujoco>...</mujoco> doc. Strip the
+    # outer wrapper; we want its INNER sections (worldbody/asset/
+    # actuator/default), not the <mujoco> tag or nested <worldbody>.
+    robot_xml = _strip_mujoco_wrapper(robot_xml)
+    # Add fist collision spheres to the wrist bodies.
+    robot_xml = _add_fist_geoms(robot_xml)
 
-    xml_r1 = _prefix_xml(xml, "r1_")
-    xml_r2 = _prefix_xml(xml, "r2_")
+    # Extract the inner sections we need from the robot XML.
+    robot_world = _extract_section(robot_xml, "worldbody")
+    robot_asset = _extract_section(robot_xml, "asset")
+    robot_actu = _extract_section(robot_xml, "actuator")
+    # (robot <default> classes are merged via our own <default> block;
+    #  the robot's motor classes are referenced by class= attr in
+    #  its bodies/joints, so we re-declare them in our <default>.)
 
-    def extract_sections(x):
-        asset = re.search(r'<asset>(.*?)</asset>', x, re.DOTALL)
-        worldbody = re.search(r'<worldbody>(.*?)</worldbody>', x, re.DOTALL)
-        actuator = re.search(r'<actuator>(.*?)</actuator>', x, re.DOTALL)
-        default = re.search(r'<default>(.*?)</default>', x, re.DOTALL)
-        return {
-            'asset': asset.group(1) if asset else '',
-            'worldbody': worldbody.group(1) if worldbody else '',
-            'actuator': actuator.group(1) if actuator else '',
-            'default': default.group(1) if default else '',
-        }
-    r1 = extract_sections(xml_r1)
-    r2 = extract_sections(xml_r2)
+    # Prefix each robot's sections with r1_/r2_.
+    r1_world = _prefix_xml(robot_world, "r1_")
+    r2_world = _prefix_xml(robot_world, "r2_")
+    r1_asset = _prefix_xml(robot_asset, "r1_")
+    r2_asset = _prefix_xml(robot_asset, "r2_")
+    r1_actu = _prefix_xml(robot_actu, "r1_")
+    r2_actu = _prefix_xml(robot_actu, "r2_")
 
-    r1_body = r1['worldbody'].replace(
-        'pos="0 0 0.793"',
-        'pos="-0.6 0 0.793"'
-    )
-    r2_body = r2['worldbody'].replace(
-        'pos="0 0 0.793"',
-        'pos="0.3 0 0.793"'
-    )
+    # Offset the root body of each robot on X (facing each other).
+    r1_body = r1_world.replace('pos="0 0 0.793"', 'pos="-0.6 0 0.793"')
+    r2_body = r2_world.replace('pos="0 0 0.793"', 'pos="0.3 0 0.793"')
 
     ring_geoms = _ring_geoms(ring, half)
 
@@ -214,8 +242,8 @@ def build_arena(ring="ropes", half=2.4):
     <texture type="2d" name="groundplane" builtin="checker" mark="edge"
              rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
     <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
-    {r1['asset']}
-    {r2['asset']}
+    {r1_asset}
+    {r2_asset}
   </asset>
 
   <worldbody>
@@ -232,8 +260,8 @@ def build_arena(ring="ropes", half=2.4):
   </worldbody>
 
   <actuator>
-    {r1['actuator']}
-    {r2['actuator']}
+    {r1_actu}
+    {r2_actu}
   </actuator>
 </mujoco>"""
 
@@ -251,7 +279,7 @@ def build_arena(ring="ropes", half=2.4):
     # Performance: disable mesh-mesh self-collision we don't need, BUT keep
     # foot/ankle contact ENABLED -- the G1's feet are mesh geoms only, so
     # disabling them removes foot-ground contact and the robot cannot stand.
-    # (Found 2026-07-26: feet had no collision -> PD-to-HOME sagged + fell.)
+    # (Found: feet had no collision -> PD-to-HOME sagged + fell.)
     TORSO_TARGET_BODIES = {
         "r1_torso_link", "r2_torso_link",
         "r1_left_shoulder_pitch_link", "r1_left_shoulder_roll_link",
@@ -297,3 +325,10 @@ def build_arena(ring="ropes", half=2.4):
             model.geom_condim[i] = 4
 
     return model
+
+
+def _extract_section(xml, tag):
+    """Extract the contents of <tag>...</tag> from the robot XML."""
+    m = re.search(rf'<{tag}>(.*?)</{tag}>', xml, re.DOTALL)
+    return m.group(1) if m else ""
+
