@@ -42,7 +42,8 @@ class G1FighterEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, balance_path=None, opponent_path=None,
-                 max_steps=1500, randomize=True, motion_dir=None, demo=False):
+                 max_steps=1500, randomize=True, motion_dir=None, demo=False,
+                 king=None):
         super().__init__()
         self.model = build_arena(ring="ropes", half=2.4)
         self.data = mujoco.MjData(self.model)
@@ -54,6 +55,11 @@ class G1FighterEnv(gym.Env):
         # residual scale so scripted punches/footwork actually SHOW.
         # Never set by training (fighters learn small residuals).
         self.demo = demo
+        # king: which robot (0 or 1) is the reigning king -> RED gloves.
+        # None -> default r1=red, r2=blue (legacy left/right).
+        self.king = king
+        if king is not None:
+            self._color_gloves_by_king(king)
 
         # Capture fighters use HOME as the balance base (NOT self.native).
         # The balance policy is TRAINED relative to HOME (g1_balance_env:
@@ -88,6 +94,18 @@ class G1FighterEnv(gym.Env):
         self.rng_kd = KD.copy()
         self.torque_noise_std = 0.0          # no noise unless randomized
         self._delay_buf = {}
+
+    def _color_gloves_by_king(self, king):
+        """Recolor fist geoms: the KING robot gets RED gloves, the
+        challenger gets BLUE. king in {0,1}. r1 -> red if king==0
+        else blue; r2 -> red if king==1 else blue."""
+        RED = [0.95, 0.12, 0.12, 1.0]
+        BLUE = [0.15, 0.35, 0.95, 1.0]
+        for i in range(self.model.ngeom):
+            nm = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
+            if nm.endswith("_fist_col"):
+                slot = 0 if nm.startswith("r1_") else 1
+                self.model.geom_rgba[i] = RED if slot == king else BLUE
 
     def _load_ppo(self, path):
         from stable_baselines3 import PPO

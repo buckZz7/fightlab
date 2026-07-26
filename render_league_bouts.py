@@ -19,19 +19,26 @@ from boxing_rules import BoxingJudge
 from league import _load_entrant
 
 
-def render_bout(spec_a, spec_b, balance, out, steps):
+def render_bout(spec_a, spec_b, balance, out, steps, king_of=None):
+    """king_of: name of the king fighter among {spec_a, spec_b} -> its
+    robot gets RED gloves (the other is the BLUE challenger)."""
     env = G1FighterEnv(balance_path=balance, opponent_path=None,
                        max_steps=steps, randomize=False)
     env.opponent = _load_entrant(spec_b, env, for_blue=True)
+    # king role: red gloves to whichever entrant is the king.
+    # r1 = red-side (drives via env.step), r2 = blue-side (opponent).
+    if king_of == spec_a:
+        env._color_gloves_by_king(0)   # r1 is king -> red
+    elif king_of == spec_b:
+        env._color_gloves_by_king(1)   # r2 is king -> red
     judge = BoxingJudge(env, round_seconds=30.0, rounds=3)
     red = _load_entrant(spec_a, env, for_blue=False)
 
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    # Clean side-on 3/4 ring view: azimuth diagonal across the ring,
-    # slight downward elevation, lookat at ring center / chest height.
-    # (elevation POSITIVE = camera above, looking down -- NOT below.)
-    cam.azimuth = 45.0; cam.elevation = 12.0; cam.distance = 5.0
+    # Broadcast hero angle: elevated 3/4 diagonal, shows ring depth +
+    # footwork + ropes. az=30 el=25 (vision-verified broadcast look).
+    cam.azimuth = 30.0; cam.elevation = 25.0; cam.distance = 6.0
     cam.lookat[:] = [-0.15, 0, 0.9]
     rend = mujoco.Renderer(env.model, height=540, width=960)
 
@@ -71,6 +78,7 @@ def main():
 
     d = json.load(open(a.standings))
     results = d["results"]
+    king = d.get("king")
     # pick the top matchups: king's bouts + spread
     rendered = []
     seen = set()
@@ -84,7 +92,8 @@ def main():
         out = os.path.join(a.out_dir,
                             f"{r['red'].replace(':', '_')}_vs_"
                             f"{r['blue'].replace(':', '_')}.mp4")
-        n, card = render_bout(r["red"], r["blue"], balance, out, a.steps)
+        n, card = render_bout(r["red"], r["blue"], balance, out, a.steps,
+                               king_of=king)
         r["mp4"] = os.path.relpath(out, os.path.dirname(a.standings))
         r["n_frames"] = n
         r["card"] = card

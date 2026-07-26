@@ -145,11 +145,11 @@ def main():
     ap.add_argument("--no-terminate", action="store_true",
                     help="demo: don't stop on fall/KO (full-length clip)")
     # --- tunable camera (ropes never between lens + bots) ---
-    ap.add_argument("--cam_az", type=float, default=45.0,
-                    help="azimuth deg (45 = diagonal 3/4 across ring)")
-    ap.add_argument("--cam_el", type=float, default=12.0,
+    ap.add_argument("--cam_az", type=float, default=30.0,
+                    help="azimuth deg (30 = elevated 3/4 hero angle)")
+    ap.add_argument("--cam_el", type=float, default=25.0,
                     help="elevation deg (+up, looking down)")
-    ap.add_argument("--cam_dist", type=float, default=5.0,
+    ap.add_argument("--cam_dist", type=float, default=6.0,
                     help="camera distance (m)")
     ap.add_argument("--cam_lookat", default="-0.15 0 0.9",
                     help="lookat 'x y z' (ring center, chest height)")

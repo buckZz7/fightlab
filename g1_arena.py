@@ -121,34 +121,39 @@ def _ring_geoms(ring, half):
     # 'ropes' (default): 4 padded corner posts (hard) + 4 rope levels (soft)
     h = half
     g = []
-    # Corner posts: solid, padded look, hard contact. West=red (r1), East=blue (r2)
-    post_specs = [(-1, -1, "0.9 0.1 0.1"), (-1, 1, "0.9 0.1 0.1"),
-                  (1, -1, "0.1 0.3 0.9"), (1, 1, "0.1 0.3 0.9")]
-    for sx, sy, col in post_specs:
+    # Corner posts: padded cylinders at the 4 corners ONLY. NEAR-BLACK
+    # (charcoal) so they read clean against the dark theater and don't
+    # fight the glove colors. Slightly inset so they frame, not block.
+    inset = 0.12
+    post_specs = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+    for sx, sy in post_specs:
         g.append(
             f'<geom name="post_{sx}_{sy}" '
-            f'type="cylinder" pos="{sx*h} {sy*h} {POST_H/2}" '
-            f'size="{POST_R} {POST_H/2} 0" rgba="{col} 0.8" '
+            f'type="cylinder" pos="{sx*(h-inset)} {sy*(h-inset)} {POST_H/2}" '
+            f'size="{POST_R} {POST_H/2} 0" rgba="0.12 0.12 0.14 1" '
             f'contype="1" conaffinity="1"/>')
-    # Ropes: thin compliant bars along each edge at each height
+    # Ropes: THICK solid tubes, NEAR-BLACK (charcoal) vinyl so they
+    # read as a real ring silhouette against the spotlight, not a
+    # colored cage. Gloves (red/blue) are the only color accent.
+    rope_rgba = "0.13 0.13 0.15 1"
     for lvl in ROPE_HEIGHTS:
         # North/South (along X) at y=+/-h
         g.append(
             f'<geom name="rope_n_{lvl}" type="box" pos="0 {h} {lvl}" '
-            f'size="{h} {ROPE_DIA/2} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{h} {ROPE_DIA} {ROPE_DIA}" rgba="{rope_rgba}" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
         g.append(
             f'<geom name="rope_s_{lvl}" type="box" pos="0 {-h} {lvl}" '
-            f'size="{h} {ROPE_DIA/2} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{h} {ROPE_DIA} {ROPE_DIA}" rgba="{rope_rgba}" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
         # East/West (along Y) at x=+/-h
         g.append(
             f'<geom name="rope_e_{lvl}" type="box" pos="{h} 0 {lvl}" '
-            f'size="{ROPE_DIA/2} {h} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{ROPE_DIA} {h} {ROPE_DIA}" rgba="{rope_rgba}" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
         g.append(
             f'<geom name="rope_w_{lvl}" type="box" pos="{-h} 0 {lvl}" '
-            f'size="{ROPE_DIA/2} {h} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{ROPE_DIA} {h} {ROPE_DIA}" rgba="{rope_rgba}" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
     # Hard invisible backstop just outside ropes (anti-tunnel at speed).
     bs = 0.07
@@ -232,22 +237,29 @@ def build_arena(ring="ropes", half=2.4):
   </default>
 
   <visual>
-    <headlight diffuse="0.7 0.7 0.7" ambient="0.35 0.35 0.35" specular="0 0 0"/>
-    <rgba haze="0.5 0.5 0.55 1"/>
+    <headlight diffuse="0.5 0.5 0.5" ambient="0.18 0.18 0.2" specular="0 0 0"/>
+    <rgba haze="0.03 0.03 0.04 1"/>
     <global azimuth="-130" elevation="-20" offwidth="1280" offheight="720"/>
   </visual>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.35 0.35 0.4" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.05 0.05 0.07" rgb2="0 0 0" width="512" height="3072"/>
     <texture type="2d" name="groundplane" builtin="checker" mark="edge"
-             rgb1="0.45 0.45 0.48" rgb2="0.3 0.3 0.33" markrgb="0.7 0.7 0.7" width="300" height="300"/>
+             rgb1="0.42 0.42 0.45" rgb2="0.28 0.28 0.3" markrgb="0.65 0.65 0.65" width="300" height="300"/>
     <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
     {r1_asset}
     {r2_asset}
   </asset>
 
   <worldbody>
-    <light pos="0 0 3" dir="0 0 -1" directional="true"/>
+    <!-- Boxing-theater lighting: dark surroundings + a strong
+         overhead spotlight centered on the ring. -->
+    <light pos="0 0 3.2" dir="0 0 -1" directional="true"
+           diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3"/>
+    <light pos="-1.2 0 3.5" dir="0.3 0 -1" directional="false"
+           diffuse="0.55 0.55 0.6" specular="0.2 0.2 0.2"/>
+    <light pos="1.2 0 3.5" dir="-0.3 0 -1" directional="false"
+           diffuse="0.55 0.55 0.6" specular="0.2 0.2 0.2"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
     {ring_geoms}
