@@ -59,7 +59,7 @@ def main():
     ap.add_argument("--out", default="models/balance_v1")
     ap.add_argument("--max_steps", type=int, default=1500)
     ap.add_argument("--randomize", action="store_true", default=True)
-    ap.add_argument("--n_envs", type=int, default=4)
+    ap.add_argument("--n_envs", type=int, default=16)
     ap.add_argument("--tb", default="")
     ap.add_argument("--skip_preflight", action="store_true",
                     help="skip the PD-stand pre-flight gate")
@@ -69,11 +69,20 @@ def main():
         _preflight()
 
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
-    env = G1BalanceEnv(max_steps=a.max_steps, randomize=a.randomize)
+
+    # Parallelize rollouts across CPU cores (MuJoCo sim is CPU-bound).
+    # Pod has 32 cores; 16 envs ~4x throughput vs single-env.
+    from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
+    def _make():
+        return G1BalanceEnv(max_steps=a.max_steps, randomize=a.randomize)
+    if a.n_envs > 1:
+        env = SubprocVecEnv([_make for _ in range(a.n_envs)])
+    else:
+        env = _make()
 
     # env sanity
     try:
-        check_env(env, warn=True)
+        check_env(G1BalanceEnv(max_steps=a.max_steps, randomize=a.randomize), warn=True)
         print("[ok] env check passed")
     except Exception as e:
         print("[warn] env check:", e)
