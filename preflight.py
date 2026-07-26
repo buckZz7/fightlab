@@ -25,7 +25,7 @@ import mujoco
 from g1_arena import build_arena
 from loco_base29 import StandPD, KP, KD, HOME
 
-STAND_STEPS = 300      # ~6s -- if PD can't hold this, RL is hopeless
+STAND_STEPS = 750      # ~1.5s @ DT=0.002 -- catches the slow PD sag
 FALL_Z = 0.40
 
 
@@ -37,6 +37,8 @@ def check_pd_stand():
     mujoco.mj_resetData(m, d)
     d.qpos[0:3] = [-0.6, 0, 0.793]
     d.qpos[7:36] = HOME
+    d.qpos[36:39] = [0.3, 0, 0.793]   # r2 root at offset 36
+    d.qpos[43:72] = HOME               # r2 joints at offset 36
     mujoco.mj_forward(m, d)
 
     spd = StandPD()
@@ -45,7 +47,7 @@ def check_pd_stand():
     for i in range(STAND_STEPS):
         tau = KP * (HOME - d.qpos[7:36]) - KD * d.qvel[6:35]
         d.ctrl[:29] = np.clip(tau, lo[:29], hi[:29])
-        tau2 = KP * (HOME - d.qpos[14:43]) - KD * d.qvel[13:42]
+        tau2 = KP * (HOME - d.qpos[43:72]) - KD * d.qvel[41:70]
         d.ctrl[29:58] = np.clip(tau2, lo[29:], hi[29:])
         mujoco.mj_step(m, d, 1)
         z = float(d.qpos[2])

@@ -26,8 +26,8 @@ from g1_arena import build_arena
 from loco_base29 import StandPD, KP, KD, HOME
 from g1_moves_reward import MoveCoach
 
-DT = 0.01
-FRAME_SKIP = 4
+DT = 0.002   # MUST match g1_arena.DT (RK4 stable timestep). 0.01 sagged.
+FRAME_SKIP = 1   # control every physics step (500Hz). Mirrors g1_balance_env.
 N_SKILL = 14
 N_CMD = 3
 ACT_DIM = N_SKILL + N_CMD
@@ -51,6 +51,14 @@ class G1FighterEnv(gym.Env):
         self.max_steps = max_steps
         self.randomize = randomize
 
+        # Capture fighters use HOME as the balance base (NOT self.native).
+        # The balance policy is TRAINED relative to HOME (g1_balance_env:
+        # target = HOME + act*SCALE_BAL, obs jrel = qp - HOME). The frozen
+        # policy must receive the exact same obs encoding + target base or
+        # it falls. self.native (XML default) != HOME -> mismatch.
+        mujoco.mj_resetData(self.model, self.data)
+        self.native = HOME.copy()   # balance base == HOME (aligned with training)
+
         self.lo = self.model.actuator_ctrlrange[:, 0].copy()
         self.hi = self.model.actuator_ctrlrange[:, 1].copy()
 
@@ -70,6 +78,12 @@ class G1FighterEnv(gym.Env):
         self.hp = [MAX_HP, MAX_HP]
         self._residuals = [np.zeros(N_SKILL), np.zeros(N_SKILL)]
         self._contact_states = {}
+        # DR defaults (overridden by _randomize() when randomize=True).
+        # Must exist even when not randomized, or _apply_control crashes.
+        self.rng_kp = KP.copy()
+        self.rng_kd = KD.copy()
+        self.torque_noise_std = 0.0          # no noise unless randomized
+        self._delay_buf = {}
 
     def _load_ppo(self, path):
         from stable_baselines3 import PPO
@@ -103,9 +117,9 @@ class G1FighterEnv(gym.Env):
     def _place(self):
         mujoco.mj_resetData(self.model, self.data)
         for ai, x in enumerate(NATIVE_ROOT_X):
-            off = ai * 7
+            off = ai * 36            # each robot = 7 (root) + 29 (joints) = 36 qpos
             self.data.qpos[off:off + 3] = [x, 0, 0.793]
-            self.data.qpos[off + 3:off + 32] = HOME[:29]  # 29 joint targets
+            self.data.qpos[off + 7:off + 36] = self.native[:29]  # HOME joints (29)
         if self.randomize:
             self._randomize()
         mujoco.mj_forward(self.model, self.data)
@@ -136,12 +150,12 @@ class G1FighterEnv(gym.Env):
         self.data.ctrl[agent_ctrl_slice] = out
 
     def _get_obs(self, agent=0):
-        off = 0 if agent == 0 else 7
+        off = 0 if agent == 0 else 36
         qp = self.data.qpos[off:off + 36]
         qv = self.data.qvel[off:off + 35]
         quat = qp[3:7]
         angvel = qv[3:6]
-        jrel = qp[7:36] - HOME
+        jrel = qp[7:36] - self.native
         jvel = qv[6:35]
         hp_self = np.array([self.hp[agent]])
         hp_opp = np.array([self.hp[1 - agent]])
@@ -161,10 +175,10 @@ class G1FighterEnv(gym.Env):
 
     def _bal_obs(self, agent):
         """obs for the frozen balance policy (65-dim: quat,angvel,jrel,jvel)."""
-        off = 0 if agent == 0 else 7
+        off = 0 if agent == 0 else 36
         qp = self.data.qpos[off:off + 36]
         qv = self.data.qvel[off:off + 35]
-        return np.concatenate([qp[3:7], qv[3:6], qp[7:36] - HOME, qv[6:35]]).astype(np.float64)
+        return np.concatenate([qp[3:7], qv[3:6], qp[7:36] - self.native, qv[6:35]]).astype(np.float64)
 
     def _opp_action(self):
         if self.opponent is None:
@@ -235,7 +249,7 @@ class G1FighterEnv(gym.Env):
                 self._residuals[agent] += 0.25 * (raw - self._residuals[agent])
             # r1: frozen balance residual + arm residual
             bal_act = self.balance.predict(self._bal_obs(0), deterministic=True)[0] if self.balance else np.zeros(29)
-            target = bal_act * 0.40 + HOME   # MUST match SCALE_BAL in g1_balance_env (0.40), else substrate starved
+            target = bal_act * 0.40 + self.native   # MUST match g1_balance_env base (native) + SCALE_BAL (0.40)
             target[15:29] += self._residuals[0]
             kp = getattr(self, "rng_kp", KP)
             kd = getattr(self, "rng_kd", KD)
@@ -244,12 +258,12 @@ class G1FighterEnv(gym.Env):
             # r2: opponent or stand (no arm action)
             if self.opponent:
                 bal_act2 = self.balance.predict(self._bal_obs(1), deterministic=True)[0] if self.balance else np.zeros(29)
-                t2 = bal_act2 * 0.40 + HOME
+                t2 = bal_act2 * 0.40 + self.native
                 t2[15:29] += self._residuals[1]
-                tau2 = kp * (t2 - self.data.qpos[14:43]) - kd * self.data.qvel[13:42]
+                tau2 = kp * (t2 - self.data.qpos[43:72]) - kd * self.data.qvel[41:70]
                 self._apply_control(tau2, slice(29, 58))
             else:
-                tau2 = StandPD().pd_torque(self.data.qpos, self.data.qvel, off=7)
+                tau2 = StandPD().pd_torque(self.data.qpos, self.data.qvel, off=36)
                 self._apply_control(tau2, slice(29, 58))
             mujoco.mj_step(self.model, self.data, 1)
 

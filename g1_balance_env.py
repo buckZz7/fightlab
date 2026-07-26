@@ -23,10 +23,12 @@ import mujoco
 import gymnasium as gym
 
 from g1_arena import build_arena
-from loco_base29 import StandPD, KP, KD
+from loco_base29 import StandPD, KP, KD, HOME
 
-DT = 0.01
-FRAME_SKIP = 4
+DT = 0.002   # MUST match g1_arena.DT (RK4 stable timestep). Overriding to
+             # 0.01 made the humanoid sag + fall (RK4 too coarse at 10ms).
+FRAME_SKIP = 1   # control every physics step (500Hz, matches the stable
+                 # preflight PD loop). 300 steps = 0.6s; use more for longer.
 N_ACT = 29
 N_OBS = 4 + 3 + 29 + 29
 SCALE_BAL = 0.40          # rad residual scale (policy needs real authority
@@ -61,10 +63,11 @@ class G1BalanceEnv(gym.Env):
         self.lo = self.model.actuator_ctrlrange[:, 0].copy()
         self.hi = self.model.actuator_ctrlrange[:, 1].copy()
 
-        # native pose (after reset, before placing) = the XML's stand pose
-        mujoco.mj_resetData(self.model, self.data)
-        self.native = [self.data.qpos[i * 36: i * 36 + 36].copy()
-                       for i in range(2)]
+        # Base pose = HOME (the proven-stable stand pose StandPD holds
+        # for 300 steps -- see preflight.py). The balance policy learns
+        # residuals around HOME. Using native here caused the policy to
+        # train on an unstable base and never converge (stood 18/1500).
+        self.base = HOME.copy()
 
         self.loco = StandPD()           # r2 frozen stander
         self.action_space = gym.spaces.Box(-1.0, 1.0, shape=(N_ACT,), dtype=np.float64)
@@ -74,9 +77,10 @@ class G1BalanceEnv(gym.Env):
     def _place(self):
         mujoco.mj_resetData(self.model, self.data)
         for ai, x in enumerate(NATIVE_ROOT_X):
-            off = ai * 7
+            off = ai * 36            # each robot = 7 (root) + 29 (joints) = 36 qpos
             self.data.qpos[off: off + 3] = [x, 0, STAND_Z]
-            self.data.qpos[off + 3: off + 32] = self.native[ai][7:36]  # native joints (29)
+            # robot joints at qpos[off+7 : off+36]
+            self.data.qpos[off + 7: off + 36] = self.base[:29]  # HOME joints (29)
         if self.randomize:
             self._randomize()
         mujoco.mj_forward(self.model, self.data)
@@ -93,7 +97,7 @@ class G1BalanceEnv(gym.Env):
         qv = self.data.qvel[off: off + 35]
         quat = qp[3:7]
         angvel = qv[3:6]
-        jrel = qp[7:36] - self.native[0][7:36]
+        jrel = qp[7:36] - self.base     # base is 29-dim HOME joints
         jvel = qv[6:35]
         return np.concatenate([quat, angvel, jrel, jvel]).astype(np.float64)
 
@@ -105,24 +109,25 @@ class G1BalanceEnv(gym.Env):
 
     def step(self, action):
         act = np.clip(action, -1, 1) * SCALE_BAL
-        target = self.native[0][7:36] + act     # r1 PD target
+        target = self.base + act     # r1 PD target (around HOME, 29-dim)
 
         for _ in range(self.frame_skip):
-            # r1: PD to learned target
+            # r1 (offset 0): PD to learned target
             tau1 = KP * (target - self.data.qpos[7:36]) - KD * self.data.qvel[6:35]
             self.data.ctrl[:29] = np.clip(tau1, self.lo[:29], self.hi[:29])
-            # r2: StandPD frozen
-            self.loco.update(self.data.qpos, self.data.qvel, off=7)
+            # r2 (offset 36): StandPD frozen
+            self.loco.update(self.data.qpos, self.data.qvel, off=36)
             t2 = self.loco.target
-            tau2 = KP * (t2 - self.data.qpos[14:43]) - KD * self.data.qvel[13:42]
+            tau2 = KP * (t2 - self.data.qpos[43:72]) - KD * self.data.qvel[41:70]
             self.data.ctrl[29:58] = np.clip(tau2, self.lo[29:], self.hi[29:])
             try:
                 mujoco.mj_step(self.model, self.data, 1)
             except mujoco.FatalError:
-                # Degenerate contact (rank-deficient Hessian). Treat as
-                # a fall -> terminate the episode rather than kill training.
-                self.data.qpos[2] = 0.0
-                self.data.qpos[9] = 0.0
+                # Degenerate contact (rank-deficient Hessian). Do NOT force
+                # a fall -- that poisons training + the eval. Just skip this
+                # micro-step; the tol=1e-4 fix in build_arena should make
+                # this rare. Breaking here keeps the episode alive.
+                break
 
         self.step_count += 1
         z = float(self.data.qpos[2])

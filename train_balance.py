@@ -77,7 +77,9 @@ def main():
     model.save(a.out)
     print(f"[saved] {a.out}.zip")
 
-    # quick stand test
+    # REQUIRED stand test: the balance policy is the foundation for the
+    # fighter. A model that can't stand is worse than useless (it poisons
+    # the fighter env). Refuse to save a non-standing model.
     test = G1BalanceEnv(max_steps=1500, randomize=False)
     o, _ = test.reset()
     survived = 0
@@ -88,6 +90,14 @@ def main():
             break
         survived = i + 1
     print(f"[eval] stood {survived}/1500 steps ({(survived/1500*100):.0f}s) z={float(test.data.qpos[2]):.3f}")
+    if survived < 1500:
+        print(f"[eval] FAIL: balance policy stands only {survived} steps (<1500 = full episode). "
+              f"NOT saving a broken substrate. Fix training and rerun.")
+        # remove the bad model so downstream steps don't use it
+        import os as _os
+        _os.remove(f"{a.out}.zip")
+        sys.exit(1)
+    print(f"[eval] PASS: balance policy stands {survived} steps -> substrate OK")
 
 
 if __name__ == "__main__":
