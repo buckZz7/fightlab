@@ -4,16 +4,19 @@ import mujoco
 
 ROPE_SOLREF = "0.06 1"
 ROPE_SOLIMP = "0.9 0.95 0.001"
+HALF = 2.4
+# 4 regulation ropes; test the TOP one at y=HALF, height 1.37
+ROPE_Y = 1.37
 
 XML = f"""<mujoco model="ropetest">
   <option timestep="0.002" gravity="0 0 -9.81"/>
   <worldbody>
     <geom name="floor" type="plane" size="0 0 0.05" contype="1" conaffinity="1"/>
-    <!-- north rope at y=1.2, compliant -->
-    <geom name="rope_n" type="box" pos="0 1.2 0.76" size="1.2 0.015 0.015"
+    <!-- top rope at y=HALF, compliant, 25mm -->
+    <geom name="rope_n" type="box" pos="0 {HALF} {ROPE_Y}" size="{HALF} 0.0125 0.0125"
           contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>
     <!-- free test box -->
-    <body name="box" pos="0 1.0 0.76">
+    <body name="box" pos="0 {HALF-0.2} {ROPE_Y}">
       <freejoint/>
       <geom type="box" size="0.08 0.08 0.08" mass="2.0" contype="1" conaffinity="1"/>
     </body>
@@ -37,9 +40,9 @@ for i in range(400):
     maxy = max(maxy, y)
     if i > 60:
         settle.append(y)
-    if y > 1.3:
+    if y > HALF + 0.2:
         passed = True
 
-print(f"box y max = {maxy:.2f}  (rope at y=1.2)")
+print(f"box y max = {maxy:.2f}  (rope at y={HALF})")
 print(f"LEAKED past rope : {passed}")
 print(f"settled y       = {min(settle):.2f}  (compliant catch, no rebound overshoot)")

@@ -60,10 +60,13 @@ def _prefix_xml(xml, prefix):
     return xml
 
 
-# Regulation rope heights (m) above mat: 18/30/42 inch.
-ROPE_HEIGHTS = (0.46, 0.76, 1.07)
+# Regulation rope heights (m) above mat: 18/30/42/54 inch (USA Boxing + AIBA).
+ROPE_HEIGHTS = (0.46, 0.76, 1.07, 1.37)
+ROPE_DIA = 0.025            # 25 mm diameter (>=1in reg)
 ROPE_SOLREF = "0.06 1"          # tc=0.06 (compliant), ratio=1 (no bounce)
 ROPE_SOLIMP = "0.9 0.95 0.001"  # smooth ramp, near-zero margin
+POST_H = 1.47              # 58in above canvas (reg)
+POST_R = 0.05               # <=4in diameter (reg)
 
 
 def _ring_geoms(ring, half):
@@ -75,44 +78,64 @@ def _ring_geoms(ring, half):
     <geom name="wall_s" type="box" pos="0 -2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
     <geom name="wall_e" type="box" pos="2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
     <geom name="wall_w" type="box" pos="-2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>"""
-    # 'ropes' (default): 4 padded corner posts (hard) + 3 rope levels (soft)
+    # 'ropes' (default): 4 padded corner posts (hard) + 4 rope levels (soft)
     h = half
     g = []
-    # Corner posts: solid, padded look, hard contact
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            g.append(
-                f'<geom name="post_{"p" if sx>0 else "n"}{"e" if sy>0 else "w"}" '
-                f'type="cylinder" pos="{sx*h} {sy*h} 0.7" size="0.05 0.7 0" '
-                f'rgba="0.1 0.3 0.9 0.7" contype="1" conaffinity="1"/>')
+    # Corner posts: solid, padded look, hard contact. West=red (r1), East=blue (r2)
+    post_specs = [(-1, -1, "0.9 0.1 0.1"), (-1, 1, "0.9 0.1 0.1"),
+                  (1, -1, "0.1 0.3 0.9"), (1, 1, "0.1 0.3 0.9")]
+    for sx, sy, col in post_specs:
+        g.append(
+            f'<geom name="post_{sx}_{sy}" '
+            f'type="cylinder" pos="{sx*h} {sy*h} {POST_H/2}" '
+            f'size="{POST_R} {POST_H/2} 0" rgba="{col} 0.8" '
+            f'contype="1" conaffinity="1"/>')
     # Ropes: thin compliant bars along each edge at each height
     for lvl in ROPE_HEIGHTS:
         # North/South (along X) at y=+/-h
         g.append(
             f'<geom name="rope_n_{lvl}" type="box" pos="0 {h} {lvl}" '
-            f'size="{h} 0.015 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{h} {ROPE_DIA/2} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
         g.append(
             f'<geom name="rope_s_{lvl}" type="box" pos="0 {-h} {lvl}" '
-            f'size="{h} 0.015 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{h} {ROPE_DIA/2} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
         # East/West (along Y) at x=+/-h
         g.append(
             f'<geom name="rope_e_{lvl}" type="box" pos="{h} 0 {lvl}" '
-            f'size="0.015 {h} 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{ROPE_DIA/2} {h} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
         g.append(
             f'<geom name="rope_w_{lvl}" type="box" pos="{-h} 0 {lvl}" '
-            f'size="0.015 {h} 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'size="{ROPE_DIA/2} {h} {ROPE_DIA/2}" rgba="0.9 0.1 0.1 0.7" '
             f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
+    # Hard invisible backstop just outside ropes (anti-tunnel at speed).
+    # Ropes give the compliant catch + visual; backstop guarantees
+    # containment so a fast bot can't pass through the thin rope.
+    bs = 0.07
+    g.append(
+        f'<geom name="stop_n" type="box" pos="0 {h+bs} 0.9" size="{h} 0.02 0.9" '
+        f'rgba="0 0 0 0" contype="1" conaffinity="1"/>')
+    g.append(
+        f'<geom name="stop_s" type="box" pos="0 {-h-bs} 0.9" size="{h} 0.02 0.9" '
+        f'rgba="0 0 0 0" contype="1" conaffinity="1"/>')
+    g.append(
+        f'<geom name="stop_e" type="box" pos="{h+bs} 0 0.9" size="0.02 {h} 0.9" '
+        f'rgba="0 0 0 0" contype="1" conaffinity="1"/>')
+    g.append(
+        f'<geom name="stop_w" type="box" pos="{-h-bs} 0 0.9" size="0.02 {h} 0.9" '
+        f'rgba="0 0 0 0" contype="1" conaffinity="1"/>')
     return "\n    ".join(g)
 
 
-def build_arena(ring="ropes", half=1.2):
+def build_arena(ring="ropes", half=2.4):
     """Build a two-G1 boxing arena model.
 
     ring: 'ropes' (default, soft square ring) | 'walls' | 'open'
-    half: ring half-extent (m). Regulation ~16ft side => half 1.2.
+    half: ring half-extent (m). Regulation 16-20ft => half 2.4-3.05.
+          Default 2.4 (4.8m, min pro) for fight density; tunable
+          knob - widening is a cheap warm-start fine-tune, ropes transfer.
     """
     MESH_DIR = os.environ.get(
         "G1_MESH_DIR",
