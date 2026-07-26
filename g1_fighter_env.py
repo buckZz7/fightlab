@@ -111,8 +111,29 @@ class G1FighterEnv(gym.Env):
         mujoco.mj_forward(self.model, self.data)
 
     def _randomize(self):
+        # --- Sim2Real domain randomization (canonical G1 set) ---
+        # Mass + payload
         self.model.body_mass[:] = self._base_mass * np.random.uniform(0.9, 1.1, self.model.nbody)
+        # Foot/contact friction
         self.model.geom_friction[:, 0] = self._base_friction[:, 0] * np.random.uniform(0.85, 1.15, self.model.ngeom)
+        # PD-gain jitter (so policy isn't overfit to nominal gains)
+        self.rng_kp = KP * np.random.uniform(0.85, 1.15, 29)
+        self.rng_kd = KD * np.random.uniform(0.85, 1.15, 29)
+        # Actuator torque-noise std (applied each step)
+        self.torque_noise_std = 0.05 * np.mean(np.abs(self.lo))  # ~5% of ctrl range
+
+    def _apply_control(self, agent_tau, agent_ctrl_slice):
+        """Apply PD torque with sim2real noise: torque noise + 1-step delay."""
+        noise = np.random.normal(0.0, self.torque_noise_std, agent_tau.shape)
+        tau = agent_tau + noise
+        # 1-step actuator delay (ring buffer): command lags 1 control step
+        if not hasattr(self, "_delay_buf"):
+            self._delay_buf = {}
+        buf = self._delay_buf.setdefault(agent_ctrl_slice.start,
+                                         np.zeros_like(tau))
+        out = buf.copy()
+        buf[:] = np.clip(tau, self.lo[agent_ctrl_slice], self.hi[agent_ctrl_slice])
+        self.data.ctrl[agent_ctrl_slice] = out
 
     def _get_obs(self, agent=0):
         off = 0 if agent == 0 else 7
@@ -216,18 +237,20 @@ class G1FighterEnv(gym.Env):
             bal_act = self.balance.predict(self._bal_obs(0), deterministic=True)[0] if self.balance else np.zeros(29)
             target = bal_act * 0.40 + HOME   # MUST match SCALE_BAL in g1_balance_env (0.40), else substrate starved
             target[15:29] += self._residuals[0]
-            tau1 = KP * (target - self.data.qpos[7:36]) - KD * self.data.qvel[6:35]
-            self.data.ctrl[:29] = np.clip(tau1, self.lo[:29], self.hi[:29])
+            kp = getattr(self, "rng_kp", KP)
+            kd = getattr(self, "rng_kd", KD)
+            tau1 = kp * (target - self.data.qpos[7:36]) - kd * self.data.qvel[6:35]
+            self._apply_control(tau1, slice(0, 29))
             # r2: opponent or stand (no arm action)
             if self.opponent:
                 bal_act2 = self.balance.predict(self._bal_obs(1), deterministic=True)[0] if self.balance else np.zeros(29)
                 t2 = bal_act2 * 0.40 + HOME
                 t2[15:29] += self._residuals[1]
-                tau2 = KP * (t2 - self.data.qpos[14:43]) - KD * self.data.qvel[13:42]
-                self.data.ctrl[29:58] = np.clip(tau2, self.lo[29:], self.hi[29:])
+                tau2 = kp * (t2 - self.data.qpos[14:43]) - kd * self.data.qvel[13:42]
+                self._apply_control(tau2, slice(29, 58))
             else:
                 tau2 = StandPD().pd_torque(self.data.qpos, self.data.qvel, off=7)
-                self.data.ctrl[29:58] = np.clip(tau2, self.lo[29:], self.hi[29:])
+                self._apply_control(tau2, slice(29, 58))
             mujoco.mj_step(self.model, self.data, 1)
 
         self.step_count += 1
