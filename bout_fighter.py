@@ -144,15 +144,15 @@ def main():
                     help="use scripted ShadowBoxers for both bots")
     ap.add_argument("--no-terminate", action="store_true",
                     help="demo: don't stop on fall/KO (full-length clip)")
-    # --- tunable camera (tight broadcast close-up default) ---
+    # --- tunable camera (full-body broadcast close-up default) ---
     ap.add_argument("--cam_az", type=float, default=90.0,
                     help="azimuth deg (90 = side-on, bots in profile)")
     ap.add_argument("--cam_el", type=float, default=10.0,
                     help="elevation deg (+up)")
-    ap.add_argument("--cam_dist", type=float, default=2.2,
-                    help="camera distance (m) -- 2.2 = fighters fill frame")
-    ap.add_argument("--cam_lookat", default="-0.15 0 0.95",
-                    help="lookat 'x y z' (ring center, chest height)")
+    ap.add_argument("--cam_dist", type=float, default=3.0,
+                    help="camera distance (m) -- 3.0 = full bodies in frame")
+    ap.add_argument("--cam_lookat", default="-0.15 0 0.7",
+                    help="lookat 'x y z' (ring center, mid-body)")
     a = ap.parse_args()
 
     env = G1FighterEnv(balance_path=a.balance, opponent_path=a.p2,

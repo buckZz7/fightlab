@@ -309,38 +309,20 @@ def build_arena(ring="ropes", half=2.4):
     # --- FIGHTER GLOVES: the VISUAL glove (fist_vis capsule) gets the
     #     king/challenger color; the physics sphere (fist_col) stays
     #     INVISIBLE (alpha 0) so damage/collision is unchanged.
+    #     Bodies stay the G1's NATURAL silver/white (accurate to the
+    #     real robot) -- gloves are the ONLY red/blue differentiator.
     for i in range(model.ngeom):
         name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
         if name.endswith("_fist_vis"):
             if name.startswith("r1_"):
-                model.geom_rgba[i] = [0.9, 0.05, 0.08, 1.0]   # king: deep RED
+                model.geom_rgba[i] = [0.9, 0.05, 0.08, 1.0]   # king: deep RED glove
             else:
-                model.geom_rgba[i] = [0.1, 0.4, 1.0, 1.0]     # challenger: BLUE
+                model.geom_rgba[i] = [0.1, 0.4, 1.0, 1.0]     # challenger: BLUE glove
 
-    # --- FIGHTER BODY ACCENTS: give each robot a distinct color so they
-    #     read as KING (red) vs CHALLENGER (blue) fighters, not identical
-    #     gray mannequins. Torso + head get a strong accent; limbs get a
-    #     subtle tint. DEEP crimson (not orange) / royal blue.
-    KING_TORSO   = [0.72, 0.05, 0.08, 1.0]   # deep crimson (less orange)
-    KING_LIMB    = [0.55, 0.15, 0.18, 1.0]
-    CHAL_TORSO   = [0.12, 0.35, 0.85, 1.0]    # royal blue
-    CHAL_LIMB    = [0.2, 0.4, 0.75, 1.0]
-    TORSO_NAMES = {"torso_link", "head_link"}
-    for i in range(model.ngeom):
-        nm = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
-        body = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY,
-                                  model.geom_bodyid[i]) or ""
-        is_king = body.startswith("r1_")
-        is_chal = body.startswith("r2_")
-        if not (is_king or is_chal):
-            continue
-        # strip prefix for name matching
-        short = body[3:] if body.startswith(("r1_", "r2_")) else body
-        if short in TORSO_NAMES:
-            model.geom_rgba[i] = KING_TORSO if is_king else CHAL_TORSO
-        elif short.endswith(("_link",)):
-            # limbs: subtle tint (legs/arms)
-            model.geom_rgba[i] = KING_LIMB if is_king else CHAL_LIMB
+    # --- FIGHTER BODY COLOR: REVERTED -- bodies stay the G1's natural
+    #     silver/white (accurate to the real robot). Only the gloves
+    #     carry the red/blue fighter differentiator.
+    # (body-accent coloring removed per design review -- cartoonish.)
     # Stability for RL random exploration: the elliptic friction cone can
     # raise a rank-deficient sparse-Hessian FatalError on degenerate
     # contacts (random exploration hits these constantly). Looser

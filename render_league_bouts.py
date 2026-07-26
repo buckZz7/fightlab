@@ -36,11 +36,10 @@ def render_bout(spec_a, spec_b, balance, out, steps, king_of=None):
 
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    # TIGHT broadcast close-up: fighters fill the frame (dist ~2.2),
-    # ring ropes at the edges as context. Side-on (az=90) so both bots
-    # are in profile facing each other. el=10 slight above.
-    cam.azimuth = 90.0; cam.elevation = 10.0; cam.distance = 2.2
-    cam.lookat[:] = [-0.15, 0, 0.95]
+    # Full-body broadcast close-up: fighters fully in frame (feet+head),
+    # dist 3.0, lookat mid-body z=0.7. Side-on (az=90) profile view.
+    cam.azimuth = 90.0; cam.elevation = 10.0; cam.distance = 3.0
+    cam.lookat[:] = [-0.15, 0, 0.7]
     rend = mujoco.Renderer(env.model, height=540, width=960)
 
     frames = []
