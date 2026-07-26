@@ -47,12 +47,7 @@
       "mp4": "bouts/scripted_jabbler_vs_scripted_defender.mp4",
       "n_frames": 250,
       "card": {
-        "winner": 0,
-        "method": "DECISION",
-        "final_hp": [
-          100.0,
-          100.0
-        ],
+        "rounds": 3,
         "round_scores": [
           [
             10
@@ -60,6 +55,20 @@
           [
             10
           ]
+        ],
+        "total_points": [
+          10.0,
+          10.0
+        ],
+        "foul_points": [
+          0.0,
+          0.0
+        ],
+        "winner": 0,
+        "method": "DECISION",
+        "final_hp": [
+          100.0,
+          100.0
         ]
       }
     },
@@ -75,7 +84,34 @@
       ],
       "rounds": 2,
       "elo_red": 1531.3,
-      "elo_blue": 1484.7
+      "elo_blue": 1484.7,
+      "mp4": "bouts/scripted_jabbler_vs_scripted_balanced.mp4",
+      "n_frames": 250,
+      "card": {
+        "rounds": 3,
+        "round_scores": [
+          [
+            10
+          ],
+          [
+            10
+          ]
+        ],
+        "total_points": [
+          10.0,
+          10.0
+        ],
+        "foul_points": [
+          0.0,
+          0.0
+        ],
+        "winner": 0,
+        "method": "DECISION",
+        "final_hp": [
+          100.0,
+          100.0
+        ]
+      }
     },
     {
       "red": "scripted:jabbler",
@@ -89,7 +125,34 @@
       ],
       "rounds": 2,
       "elo_red": 1545.8,
-      "elo_blue": 1485.4
+      "elo_blue": 1485.4,
+      "mp4": "bouts/scripted_jabbler_vs_scripted_pd.mp4",
+      "n_frames": 250,
+      "card": {
+        "rounds": 3,
+        "round_scores": [
+          [
+            10
+          ],
+          [
+            10
+          ]
+        ],
+        "total_points": [
+          10.0,
+          10.0
+        ],
+        "foul_points": [
+          0.0,
+          0.0
+        ],
+        "winner": 0,
+        "method": "DECISION",
+        "final_hp": [
+          100.0,
+          100.0
+        ]
+      }
     },
     {
       "red": "scripted:defender",
