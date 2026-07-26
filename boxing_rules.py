@@ -48,6 +48,7 @@ class BoxingJudge:
         self.ko = False
         self.winner = None
         self.dq = None
+        self._fell = False
         self._last_hp = [100.0, 100.0]
         self._last_z = [0.78, 0.78]
 
@@ -138,6 +139,13 @@ class BoxingJudge:
                     self.ko = True
                     self.winner = 1 - a
                     info['tko'] = a
+            # FALL (pelvis below FALL threshold) = round/boxing loss even
+            # if HP not depleted. The env terminates on fall; judge must
+            # record the winner as the bot still on its feet.
+            if z < 0.40 and self.winner is None:
+                self.winner = 1 - a
+                self._fell = True
+                info['fall'] = a
 
         # Round end
         if self.round_time >= self.round_seconds and not self.ko and self.dq is None:
@@ -153,6 +161,14 @@ class BoxingJudge:
             info['round_end'] = self.round
 
         done = term or trunc or self.ko or self.dq is not None
+        # If the env truncated (max_steps reached) before all rounds played,
+        # force a decision now so the bout always yields a scored card.
+        if trunc and self.winner is None and not self.ko and self.dq is None:
+            # score any in-progress round, then decide
+            self._score_round() if self.round_time > 0 else None
+            self._decide_decision()
+            info['decision'] = True
+            done = True
         return obs, rew, term, trunc, info
 
     def _score_round(self):
@@ -185,14 +201,20 @@ class BoxingJudge:
             self.winner = 0 if dmg[0] >= dmg[1] else 1
 
     def card(self):
+        method = "DECISION"
+        if self.ko:
+            method = "KO"
+        elif self.dq is not None:
+            method = "DQ"
+        elif getattr(self, "_fell", False):
+            method = "FALL"
         return {
             "rounds": self.rounds,
             "round_scores": self.round_scores,
             "total_points": self.scores,
             "foul_points": self.foul_points,
             "winner": self.winner,
-            "method": ("KO" if self.ko else "DQ" if self.dq is not None
-                       else "DECISION"),
+            "method": method,
             "final_hp": list(self.env.hp),
         }
 

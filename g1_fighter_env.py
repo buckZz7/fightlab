@@ -118,7 +118,7 @@ class G1FighterEnv(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
         for ai, x in enumerate(NATIVE_ROOT_X):
             off = ai * 36            # each robot = 7 (root) + 29 (joints) = 36 qpos
-            self.data.qpos[off:off + 3] = [x, 0, 0.793]
+            self.data.qpos[off:off + 3] = [x, 0, 0.76]   # feet ON floor (match balance env STAND_Z)
             self.data.qpos[off + 7:off + 36] = self.native[:29]  # HOME joints (29)
         if self.randomize:
             self._randomize()
