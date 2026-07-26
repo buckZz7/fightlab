@@ -8,6 +8,24 @@ SB3 TensorBoard optional.
 import os, sys, argparse, glob
 sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault("MUJOCO_GL", "osmesa")
+# Prevent torch/OpenBLAS多线程 + SubprocVecEnv fork segfaults on CPU.
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+try:
+    import torch
+    torch.set_num_threads(1)
+except Exception:
+    pass
+# SubprocVecEnv children must inherit the parent's MuJoCo/GL context +
+# env vars. On some pods the default start method is 'spawn', which
+# re-imports the main module and drops MUJOCO_GL -> GL init
+# segfault in the child. Force 'fork' so children inherit.
+import multiprocessing as _mp
+try:
+    _mp.set_start_method("fork", force=True)
+except Exception:
+    pass
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env

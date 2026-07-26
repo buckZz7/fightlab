@@ -15,7 +15,11 @@ echo "[setup] python venv + pkgs"
 python3 -m venv /opt/venv
 source /opt/venv/bin/activate
 pip install --quiet --upgrade pip
-pip install --quiet numpy mujoco==3.2.4 gymnasium stable_baselines3 imageio imageio-ffmpeg opencv-python-headless pyyaml
+pip install --quiet numpy==1.26.4 mujoco==3.2.4 gymnasium stable_baselines3 imageio imageio-ffmpeg opencv-python-headless pyyaml
+# torch MUST be the CPU build pinned to 2.2.2: the default cu130
+# build (torch 2.13) segfaults on PPO model init (dynamo/CUDA-13
+# bindings crash on this pod). numpy 1.26.4 matches torch 2.2.2's C API.
+pip install --quiet --force-reinstall torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
 
 echo "[setup] unitree_mujoco (G1 meshes + scene)"
 if [ ! -d /workspace/unitree_mujoco ]; then
