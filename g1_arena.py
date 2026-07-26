@@ -232,15 +232,15 @@ def build_arena(ring="ropes", half=2.4):
   </default>
 
   <visual>
-    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
-    <rgba haze="0.15 0.25 0.35 1"/>
+    <headlight diffuse="0.7 0.7 0.7" ambient="0.35 0.35 0.35" specular="0 0 0"/>
+    <rgba haze="0.5 0.5 0.55 1"/>
     <global azimuth="-130" elevation="-20" offwidth="1280" offheight="720"/>
   </visual>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.35 0.35 0.4" rgb2="0 0 0" width="512" height="3072"/>
     <texture type="2d" name="groundplane" builtin="checker" mark="edge"
-             rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+             rgb1="0.45 0.45 0.48" rgb2="0.3 0.3 0.33" markrgb="0.7 0.7 0.7" width="300" height="300"/>
     <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
     {r1_asset}
     {r2_asset}
@@ -267,6 +267,17 @@ def build_arena(ring="ropes", half=2.4):
 
     model = mujoco.MjModel.from_xml_string(combined)
     model.opt.timestep = DT
+    # --- FIGHTER GLOVE COLORS: king (r1) = RED gloves, challenger
+    #     (r2) = BLUE gloves. The fist geoms are prefixed r1_/r2_;
+    #     recolor them here (they were added uniform red before
+    #     prefixing). Solid, high-alpha so they read clearly.
+    for i in range(model.ngeom):
+        name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
+        if name.endswith("_fist_col"):
+            if name.startswith("r1_"):
+                model.geom_rgba[i] = [0.95, 0.12, 0.12, 1.0]   # king: RED
+            else:
+                model.geom_rgba[i] = [0.15, 0.35, 0.95, 1.0]   # challenger: BLUE
     # Stability for RL random exploration: the elliptic friction cone can
     # raise a rank-deficient sparse-Hessian FatalError on degenerate
     # contacts (random exploration hits these constantly). Looser

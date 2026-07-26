@@ -28,8 +28,11 @@ def render_bout(spec_a, spec_b, balance, out, steps):
 
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    cam.azimuth = -135.0; cam.elevation = 18.0; cam.distance = 5.0
-    cam.lookat[:] = [-0.15, 0, 0.95]
+    # Clean side-on 3/4 ring view: azimuth diagonal across the ring,
+    # slight downward elevation, lookat at ring center / chest height.
+    # (elevation POSITIVE = camera above, looking down -- NOT below.)
+    cam.azimuth = 45.0; cam.elevation = 12.0; cam.distance = 5.0
+    cam.lookat[:] = [-0.15, 0, 0.9]
     rend = mujoco.Renderer(env.model, height=540, width=960)
 
     frames = []
