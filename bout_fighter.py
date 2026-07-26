@@ -118,7 +118,16 @@ class ShadowBoxer:
         return act, None
 
 
-def _make_camera(args):
+def _make_camera(args, env):
+    """Use the built-in broadcast tracking camera from the model.
+    Falls back to free camera if not found."""
+    cam_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_CAMERA, "broadcast")
+    if cam_id >= 0:
+        cam = mujoco.MjvCamera()
+        cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+        cam.fixedcamid = cam_id
+        return cam
+    # fallback: free camera
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
     cam.azimuth = args.cam_az
@@ -134,8 +143,8 @@ def main():
                     help="fighter policy for r1 (None = shadowboxer demo)")
     ap.add_argument("--p2", default=None,
                     help="fighter policy for r2 (None = shadowboxer demo)")
-    ap.add_argument("--balance", required=True,
-                    help="balance (substrate) policy path")
+    ap.add_argument("--balance", default=None,
+                    help="balance (substrate) policy path (None = PD stand)")
     ap.add_argument("--out", default="docs/fighter_bout.mp4")
     ap.add_argument("--steps", type=int, default=1500)
     ap.add_argument("--max_round_seconds", type=float, default=3.0)
@@ -169,7 +178,7 @@ def main():
         # when demo, drive r2 via opponent_path hook using a ShadowBoxer
         env.opponent = ShadowBoxer(env, style="blue")
 
-    cam = _make_camera(a)
+    cam = _make_camera(a, env)
     rend = mujoco.Renderer(env.model, height=540, width=960)
 
     frames = []

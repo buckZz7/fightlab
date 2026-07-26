@@ -227,7 +227,7 @@ def build_arena(ring="ropes", half=2.4):
   </default>
 
   <visual>
-    <headlight diffuse="0.4 0.4 0.45" ambient="0.12 0.12 0.15" specular="0 0 0"/>
+    <headlight diffuse="0.35 0.4 0.5" ambient="0.1 0.12 0.18" specular="0 0 0"/>
     <rgba haze="0.0 0.0 0.0 0"/>
     <global azimuth="-130" elevation="-20" offwidth="1280" offheight="720"/>
   </visual>
@@ -250,13 +250,14 @@ def build_arena(ring="ropes", half=2.4):
   </asset>
 
   <worldbody>
-    <!-- Overhead spotlight on ring, default skybox surroundings. -->
+    <!-- Overhead spotlight on ring, COOL lights so the navy
+         checkerboard floor reads navy (not brown). -->
     <light pos="0 0 3.4" dir="0 0 -1" directional="true"
-           diffuse="1.0 1.0 1.0" specular="0.4 0.4 0.4" castshadow="true"/>
+           diffuse="0.9 0.95 1.0" specular="0.4 0.4 0.5" castshadow="true"/>
     <light pos="-1.5 0 3.8" dir="0.35 0 -1" directional="false"
-           diffuse="0.5 0.5 0.6" specular="0.25 0.25 0.3"/>
+           diffuse="0.45 0.5 0.65" specular="0.25 0.3 0.4"/>
     <light pos="1.5 0 3.8" dir="-0.35 0 -1" directional="false"
-           diffuse="0.5 0.5 0.6" specular="0.25 0.25 0.3"/>
+           diffuse="0.45 0.5 0.65" specular="0.25 0.3 0.4"/>
 
     <!-- DEFAULT checkerboard environment floor (unchanged). -->
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>

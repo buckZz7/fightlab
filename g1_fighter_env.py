@@ -22,7 +22,7 @@ import numpy as np
 import mujoco
 import gymnasium as gym
 
-from g1_arena import build_arena
+from street_arena import build_default_2bot
 from loco_base29 import StandPD, KP, KD, HOME
 from g1_moves_reward import MoveCoach
 
@@ -45,7 +45,7 @@ class G1FighterEnv(gym.Env):
                  max_steps=1500, randomize=True, motion_dir=None, demo=False,
                  king=None, ring="ropes"):
         super().__init__()
-        self.model = build_arena(ring=ring, half=2.4)
+        self.model = build_default_2bot()
         self.data = mujoco.MjData(self.model)
         self.model.opt.timestep = DT
         self.frame_skip = FRAME_SKIP
@@ -58,8 +58,7 @@ class G1FighterEnv(gym.Env):
         # king: which robot (0 or 1) is the reigning king -> RED gloves.
         # None -> default r1=red, r2=blue (legacy left/right).
         self.king = king
-        if king is not None:
-            self._color_gloves_by_king(king)
+        # No glove coloring (bare-handed street fight).
 
         # Capture fighters use HOME as the balance base (NOT self.native).
         # The balance policy is TRAINED relative to HOME (g1_balance_env:
@@ -146,7 +145,13 @@ class G1FighterEnv(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
         for ai, x in enumerate(NATIVE_ROOT_X):
             off = ai * 36            # each robot = 7 (root) + 29 (joints) = 36 qpos
-            self.data.qpos[off:off + 3] = [x, 0, 0.76]   # feet ON floor (match balance env STAND_Z)
+            self.data.qpos[off:off + 3] = [x, 0, 0.793]   # native G1 height
+            # Face each other: r1 (left, ai=0) faces +X, r2 (right, ai=1) faces -X.
+            # quat [w,x,y,z]: identity [1,0,0,0] = +X forward; 180° Y rot = [0,0,1,0] = -X forward.
+            if ai == 0:
+                self.data.qpos[off + 3:off + 7] = [1, 0, 0, 0]   # face +X (toward r2)
+            else:
+                self.data.qpos[off + 3:off + 7] = [0, 0, 1, 0]   # face -X (toward r1)
             self.data.qpos[off + 7:off + 36] = self.native[:29]  # HOME joints (29)
         if self.randomize:
             self._randomize()
