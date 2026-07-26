@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FightLab — Design Review</title>
+<style>
+  :root { --bg:#0a0c10; --card:#12151c; --line:#232936;
+          --txt:#e6e9ef; --mut:#8b93a3; --acc:#e8443f; --acc2:#2f6fff; --gold:#f4c542; }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body { background:var(--bg); color:var(--txt);
+         font:15px/1.6 system-ui,Segoe UI,Roboto,Helvetica,Arial;
+         max-width:980px; margin:0 auto; padding:28px 18px 60px }
+  h1 { font-size:24px } .sub { color:var(--mut); font-size:13px; margin-top:4px }
+  .card { background:var(--card); border:1px solid var(--line);
+          border-radius:14px; overflow:hidden; margin-top:18px }
+  .head { padding:12px 16px; border-bottom:1px solid var(--line);
+          font-weight:600; display:flex; gap:10px; align-items:center }
+  .head .red { color:#ff7b76 } .head .blue { color:#7aa8ff }
+  .head .vs { color:var(--mut); font-weight:400; font-size:12px }
+  video { width:100%; display:block; background:#000; aspect-ratio:16/9 }
+  .meta { padding:10px 16px; color:var(--mut); font-size:13px }
+  .note { background:#1a1610; border:1px solid #4a3a12; border-radius:12px;
+          padding:14px 18px; margin-top:18px; color:#e8d9a0; font-size:13px }
+  a { color:var(--acc2) }
+</style>
+</head>
+<body>
+  <h1>FightLab &#129354; Design Review</h1>
+  <div class="sub">Side-on broadcast camera &middot; dark theater lighting &middot;
+  king=RED gloves / challenger=BLUE &middot; dark-gray ring</div>
+
+  <div class="note">
+    <b>Review notes:</b> side-on camera (bots in profile facing each other),
+    dark-gray ring ropes + posts, spotlight on ring, red vs blue gloves.
+    Real trained fighter (fighter_v1) bouts below.
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="red">fighter_v1 (trained)</span>
+      <span class="vs">vs</span><span class="blue">scripted:jabbler</span></div>
+    <video controls muted playsinline loop>
+      <source src="bouts/fighter_v1_vs_scripted_jabbler.mp4" type="video/mp4">
+    </video>
+    <div class="meta">Trained fighter (PPO, PD substrate) vs scripted jabbler.</div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="red">scripted:jabbler (king)</span>
+      <span class="vs">vs</span><span class="blue">scripted:defender</span></div>
+    <video controls muted playsinline loop>
+      <source src="bouts/scripted_jabbler_vs_scripted_defender.mp4" type="video/mp4">
+    </video>
+    <div class="meta">King (jabbler, red gloves) vs challenger (defender, blue).</div>
+  </div>
+
+  <div class="note" style="margin-top:24px">
+    <b>Feedback wanted:</b> camera angle (side-on good? too high/low?),
+    ring visibility (dark gray reads?), glove colors (red/blue clear?),
+    lighting (theater mood right?).
+    <a href="index.html">&larr; back to league</a>
+  </div>
+</body>
+</html>

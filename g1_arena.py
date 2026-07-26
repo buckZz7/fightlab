@@ -280,16 +280,16 @@ def build_arena(ring="ropes", half=2.4):
     model = mujoco.MjModel.from_xml_string(combined)
     model.opt.timestep = DT
     # --- FIGHTER GLOVE COLORS: king (r1) = RED gloves, challenger
-    #     (r2) = BLUE gloves. The fist geoms are prefixed r1_/r2_;
-    #     recolor them here (they were added uniform red before
-    #     prefixing). Solid, high-alpha so they read clearly.
+    #     (r2) = BLUE gloves. LARGE + saturated so they read clearly
+    #     at broadcast distance (small fists were invisible on screen).
     for i in range(model.ngeom):
         name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
         if name.endswith("_fist_col"):
+            model.geom_size[i] = [0.11, 0.11, 0.11]   # bigger gloves
             if name.startswith("r1_"):
-                model.geom_rgba[i] = [0.95, 0.12, 0.12, 1.0]   # king: RED
+                model.geom_rgba[i] = [1.0, 0.05, 0.05, 1.0]   # king: RED
             else:
-                model.geom_rgba[i] = [0.15, 0.35, 0.95, 1.0]   # challenger: BLUE
+                model.geom_rgba[i] = [0.1, 0.4, 1.0, 1.0]     # challenger: BLUE
     # Stability for RL random exploration: the elliptic friction cone can
     # raise a rank-deficient sparse-Hessian FatalError on degenerate
     # contacts (random exploration hits these constantly). Looser
