@@ -58,8 +58,10 @@ class ShadowBoxer:
     def predict(self, obs, deterministic=True):
         self.t += 1
         dt = self.env.model.opt.timestep * self.env.frame_skip
-        self.phase += dt * 2.4  # ~punch cadence
-        p = self.phase
+        # desync the two bots by PI so it reads as an EXCHANGE
+        # (red punches while blue guards, then swap), not mirrored sync.
+        self.phase += dt * 2.4
+        p = self.phase if self.style == "red" else self.phase + math.pi
 
         arm = np.zeros(14)
         # Arm layout in HOME[15:29] (14 joints): pairs of
