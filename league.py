@@ -179,6 +179,53 @@ def cmd_gauntlet(path, matches=10):
     print(json.dumps(out, indent=2))
 
 
+# ----------------------------------------------------------------------------
+# Track B bout: uses G1FighterEnv + the miner contract (obs85/act17).
+# A "challenger" is any policy that predict(obs85)->act17. The KING is
+# loaded the same way. This is the Gittensor ground-truth eval:
+# deterministic seeded bout, BoxingJudge-style scoring (damage + fall).
+# ----------------------------------------------------------------------------
+def run_fighter_bout(challenger_policy, king_policy, balance_path,
+                     matches=1, max_steps=1500, seed=0):
+    """Run a bout series challenger(red) vs king(blue). Returns summary."""
+    from g1_fighter_env import G1FighterEnv
+
+    env = G1FighterEnv(balance_path=balance_path, opponent_path=None,
+                       max_steps=max_steps, randomize=False)
+    red_wins = blue_wins = draws = 0
+    cards = []
+    for m in range(matches):
+        o, _ = env.reset(seed=seed + m)
+        for step in range(max_steps):
+            a_red, _ = challenger_policy.predict(o, deterministic=True)
+            a_blue, _ = king_policy.predict(env._get_obs(1), deterministic=True)
+            o, r, term, trunc, info = env.step(a_red)
+            if term or trunc:
+                break
+        dmg_to_king = 100.0 - info["hp_1"]
+        dmg_to_chall = 100.0 - info["hp_0"]
+        if info["hp_1"] <= 0 or (info["pelvis_z_1"] < 0.4 and info["pelvis_z_0"] > 0.4):
+            red_wins += 1; winner = "red"
+        elif info["hp_0"] <= 0 or (info["pelvis_z_0"] < 0.4 and info["pelvis_z_1"] > 0.4):
+            blue_wins += 1; winner = "blue"
+        else:
+            draws += 1; winner = "draw"
+        cards.append({"match": m, "winner": winner,
+                      "dmg_to_king": round(dmg_to_king, 1),
+                      "dmg_to_challenger": round(dmg_to_chall, 1),
+                      "steps": step + 1})
+    return {"red_wins": red_wins, "blue_wins": blue_wins, "draws": draws,
+            "cards": cards}
+
+
+def load_policy(path):
+    """Load a policy via the contract (SB3 .zip for now)."""
+    from stable_baselines3 import PPO
+    if path.endswith(".zip"):
+        return PPO.load(path)
+    raise ValueError(f"unsupported policy path: {path}")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
