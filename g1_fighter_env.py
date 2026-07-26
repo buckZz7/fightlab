@@ -152,6 +152,8 @@ class G1FighterEnv(gym.Env):
 
     def _update_damage(self):
         self._contact_states = {}
+        self._dmg_dealt = [0.0, 0.0]
+        self._dmg_taken = [0.0, 0.0]
         for con in range(self.data.ncon):
             c = self.data.contact[con]
             g1, g2 = c.geom1, c.geom2
@@ -163,11 +165,21 @@ class G1FighterEnv(gym.Env):
                     other = b2 if g1 in fists else b1
                     if other in self.torso_bodies[opp]:
                         rel_vel = self._fist_rel_vel(agent, opp)
-                        shove = rel_vel < 0.5
-                        if not shove:
+                        # RoboStriker gates hits on BOTH relative speed AND
+                        # contact force. We use rel_vel as the speed gate
+                        # (force via mj_contactForce is heavier; rel_vel is a
+                        # robust proxy for a real strike vs a shove).
+                        if rel_vel > 1.0:          # real punch (forceful)
                             dmg = min(8.0, max(0.0, rel_vel * 4.0))
+                        elif rel_vel > 0.5:        # glancing
+                            dmg = min(2.0, rel_vel * 1.0)
+                        else:                      # shove (no reward)
+                            dmg = 0.0
+                        if dmg > 0:
                             self.hp[opp] = max(0.0, self.hp[opp] - dmg)
-                            self._contact_states[(agent, opp)] = {"shove": False, "dmg": dmg}
+                            self._dmg_dealt[agent] += dmg
+                            self._dmg_taken[opp] += dmg
+                            self._contact_states[(agent, opp)] = {"shove": dmg == 0, "dmg": dmg}
 
     def _fist_rel_vel(self, agent, opp):
         fb = self.model.geom_bodyid[self.fist_geoms[agent][0]]
@@ -219,8 +231,22 @@ class G1FighterEnv(gym.Env):
 
         self.step_count += 1
         self._update_damage()
-        # motion-match bonus (clean punch shape) -- coach tracks active punch
+        # motion-match bonus (clean punch shape) -- coach tracks active punch.
+        # Activate coach when the arm residual is large (bot is throwing);
+        # pick the clip whose shape best matches current arm pose.
+        arm_res = self._residuals[0]
         arm_qpos = self.data.qpos[7+15:7+29] - HOME[15:29]
+        if np.linalg.norm(arm_res) > 0.05:
+            if self.coach.active is None:
+                best, best_err = None, 1e9
+                for nm in self.coach.refs:
+                    tgt = self.coach.refs[nm]["arm"][0]
+                    err = np.mean((arm_qpos - tgt) ** 2)
+                    if err < best_err:
+                        best_err, best = err, nm
+                self.coach.start(best)
+        else:
+            self.coach.active = None
         self._coach_bonus = self.coach.step(arm_qpos, DT * self.frame_skip)
         reward = self._compute_reward(0)
 
@@ -229,9 +255,14 @@ class G1FighterEnv(gym.Env):
         terminated = z0 < 0.4 or z1 < 0.4
         truncated = self.step_count >= self.max_steps
         if terminated or truncated:
-            if self.hp[1] <= 0 or (z1 < 0.4 and z0 > 0.4):
+            # RoboStriker terminal: opponent below h_min = win; self below = loss
+            if self.hp[1] <= 0:
                 reward += 25.0
-            elif self.hp[0] <= 0 or (z0 < 0.4 and z1 > 0.4):
+            elif self.hp[0] <= 0:
+                reward -= 25.0
+            elif z1 < 0.4 and z0 > 0.4:
+                reward += 25.0
+            elif z0 < 0.4 and z1 > 0.4:
                 reward -= 25.0
         info = {"hp_0": self.hp[0], "hp_1": self.hp[1], "pelvis_z_0": z0, "pelvis_z_1": z1}
         return self._get_obs(0), reward, terminated, truncated, info
@@ -239,19 +270,32 @@ class G1FighterEnv(gym.Env):
     def _compute_reward(self, agent=0):
         opp = 1 - agent
         reward = 0.0
+        # --- Strike reward (RoboStriker: w_hit=50, gated force+speed) ---
         if (agent, opp) in self._contact_states:
             cs = self._contact_states[(agent, opp)]
             if not cs.get("shove", False):
-                reward += 15.0 * (cs.get("dmg", 0.0) / 8.0)
-        # motion-match bonus (clean punch shape)
+                reward += 50.0 * (cs.get("dmg", 0.0) / 8.0)
+        # --- Defensive penalty (RoboStriker: w_def=8) ---
+        if self._dmg_taken[agent] > 0:
+            reward -= 8.0 * (self._dmg_taken[agent] / 8.0)
+        # --- Delta striking force (RoboStriker: w_str=0.3) ---
+        reward += 0.3 * (self._dmg_dealt[agent] - self._dmg_taken[agent])
+        # --- Motion-match bonus: our AMP-equivalent (RoboStriker shows
+        #     dropping it drops hit-rate 0.685->0.49) ---
         reward += 2.0 * self._coach_bonus
-        # facing
+        # --- Facing alignment (RoboStriker: w_face=1.2, exp falloff) ---
         R = self._quat_to_rot(self.data.qpos[3:7])
         rel = self.data.xpos[self.pelvis_id[opp]] - self.data.xpos[self.pelvis_id[agent]]
         dist = np.linalg.norm(rel)
-        facing = np.dot(R[:, 0], rel / (dist + 1e-6))
-        reward += 1.0 * max(0.0, facing)
-        reward += 0.3 * (1.0 - min(1.0, abs(dist - 0.5)))
+        face_dir = rel / (dist + 1e-6)
+        facing = np.dot(R[:, 0], face_dir)
+        reward += 1.2 * np.exp(-max(0.0, 1.0 - facing) / 0.5)
+        # --- Velocity-gated approach (RoboStriker: w_dist=1.5) ---
+        # reward only when moving TOWARD opponent (anti passive/spam)
+        vel = self.data.cvel[self.pelvis_id[agent]][:3]  # world linear vel
+        approach = max(0.0, np.dot(vel, face_dir))
+        reward += 1.5 * (1.0 if approach > 0.1 else 0.0) * np.exp(-abs(dist - 0.5) / 1.0)
+        # --- Balance / keep-standing penalty ---
         reward -= 0.05 * max(0.0, 0.4 - self._pelvis_z(agent))
         return float(reward)
 
