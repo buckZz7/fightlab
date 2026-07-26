@@ -67,21 +67,22 @@ def cmd_status():
     print(f"\nCurrent king: gen{k['gen']}  {k['path']}  ELO {k['elo']:.1f}")
 
 
-def cmd_crown(path, cause="genesis"):
+def cmd_crown(path, cause="genesis", force=False):
     if not os.path.exists(path):
         sys.exit(f"no such model: {path}")
     king = current_king()
-    if king is not None:
-        sys.exit(f"king already exists (gen{king['gen']}). Use challenge to dethrone.")
+    if king is not None and not force:
+        sys.exit(f"king already exists (gen{king['gen']}). Use challenge to dethrone, or --force to replace.")
+    gen = 0 if (king is None or force) else king["gen"] + 1
     entry = {
-        "gen": 0,
+        "gen": gen,
         "path": path,
         "elo": START_ELO,
         "crowned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M"),
         "cause": cause,
     }
     append_king(entry)
-    print(f"Crowned genesis king: {path} @ ELO {START_ELO}")
+    print(f"Crowned {'genesis' if gen == 0 else 'replacement'} king: {path} @ ELO {START_ELO}")
 
 
 def cmd_challenge(challenger_path, matches):
@@ -224,6 +225,8 @@ if __name__ == "__main__":
     p = sub.add_parser("crown")
     p.add_argument("path")
     p.add_argument("--cause", default="genesis")
+    p.add_argument("--force", action="store_true",
+                   help="replace existing king (e.g. Track B king replacing old MVP king)")
     p = sub.add_parser("challenge")
     p.add_argument("path")
     p.add_argument("--matches", type=int, default=15)
@@ -235,7 +238,7 @@ if __name__ == "__main__":
     if args.cmd == "status":
         cmd_status()
     elif args.cmd == "crown":
-        cmd_crown(args.path, args.cause)
+        cmd_crown(args.path, args.cause, args.force)
     elif args.cmd == "challenge":
         cmd_challenge(args.path, args.matches)
     elif args.cmd == "gauntlet":
