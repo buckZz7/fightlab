@@ -135,19 +135,40 @@ class G1BalanceEnv(gym.Env):
         up = _quat_up(quat)
 
         reward = 0.0
-        reward += np.exp(-((z - STAND_Z) ** 2) / 0.05)   # height
+        reward += np.exp(-((z - STAND_Z) ** 2) / 0.02)   # height (tighter)
         reward += 0.5 * max(0.0, up)                          # upright
         # discourage drift/sag: penalize torso linear+angular velocity
         lin = np.linalg.norm(self.data.qvel[3:6])
         reward -= 0.02 * lin
         reward -= 0.005 * float(np.dot(act, act))                   # action cost
         reward -= 0.02 * max(0.0, 0.4 - z)                     # near-fall penalty
+        # FOOT CONTACT (plant feet on floor -- without it PD sinks)
+        fc = self._foot_contact_count()
+        reward += 0.1 * min(fc, 2)   # up to +0.2 for both feet planted
+        # ACTION SMOOTHNESS (HoST: L2 on delta-action prevents oscillation/sag)
+        if hasattr(self, "_prev_act"):
+            reward -= 0.01 * float(np.sum((act - self._prev_act) ** 2))
+        self._prev_act = act.copy()
 
         terminated = z < FALL_Z
         truncated = self.step_count >= self.max_steps
         if terminated:
             reward -= 10.0
         return self._get_obs(), float(reward), terminated, truncated, {"pelvis_z": z, "up": up}
+
+    def _foot_contact_count(self):
+        """Count r1 foot geoms touching any non-r1 body (i.e. the floor)."""
+        fb = {"r1_left_ankle_roll_link", "r1_right_ankle_roll_link",
+              "r1_left_ankle_pitch_link", "r1_right_ankle_pitch_link"}
+        n = 0
+        for c in range(self.data.ncon):
+            b1 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY,
+                                   self.model.geom_bodyid[self.data.contact[c].geom1])
+            b2 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY,
+                                   self.model.geom_bodyid[self.data.contact[c].geom2])
+            if (b1 in fb and b2 not in fb) or (b2 in fb and b1 not in fb):
+                n += 1
+        return n
 
     def render(self, height=480, width=640):
         rend = mujoco.Renderer(self.model, height=height, width=width)

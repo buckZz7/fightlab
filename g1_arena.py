@@ -248,9 +248,10 @@ def build_arena(ring="ropes", half=2.4):
     model.opt.iterations = 50
     model.opt.integrator = mujoco.mjtIntegrator.mjINT_RK4
 
-    # Performance: disable collision on mesh geoms EXCEPT torso-subtree bodies
-    # (valid punch targets). Keeps fist-to-torso contact, drops leg/hip
-    # mesh-mesh collision we don't need.
+    # Performance: disable mesh-mesh self-collision we don't need, BUT keep
+    # foot/ankle contact ENABLED -- the G1's feet are mesh geoms only, so
+    # disabling them removes foot-ground contact and the robot cannot stand.
+    # (Found 2026-07-26: feet had no collision -> PD-to-HOME sagged + fell.)
     TORSO_TARGET_BODIES = {
         "r1_torso_link", "r2_torso_link",
         "r1_left_shoulder_pitch_link", "r1_left_shoulder_roll_link",
@@ -262,11 +263,19 @@ def build_arena(ring="ropes", half=2.4):
         "r2_right_shoulder_pitch_link", "r2_right_shoulder_roll_link",
         "r2_right_shoulder_yaw_link", "r2_right_elbow_link",
     }
+    # Feet = lowest links. Must keep collision for ground contact.
+    FOOT_BODIES = {
+        "r1_left_ankle_pitch_link", "r1_left_ankle_roll_link",
+        "r1_right_ankle_pitch_link", "r1_right_ankle_roll_link",
+        "r2_left_ankle_pitch_link", "r2_left_ankle_roll_link",
+        "r2_right_ankle_pitch_link", "r2_right_ankle_roll_link",
+    }
+    KEEP_COLLISION = TORSO_TARGET_BODIES | FOOT_BODIES
     for i in range(model.ngeom):
         if model.geom_type[i] == mujoco.mjtGeom.mjGEOM_MESH:
             body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY,
                                           model.geom_bodyid[i]) or ""
-            if body_name not in TORSO_TARGET_BODIES:
+            if body_name not in KEEP_COLLISION:
                 model.geom_contype[i] = 0
                 model.geom_conaffinity[i] = 0
 
