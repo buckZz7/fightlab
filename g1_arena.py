@@ -237,30 +237,41 @@ def build_arena(ring="ropes", half=2.4):
   </default>
 
   <visual>
-    <headlight diffuse="0.5 0.5 0.5" ambient="0.18 0.18 0.2" specular="0 0 0"/>
-    <rgba haze="0.03 0.03 0.04 1"/>
+    <headlight diffuse="0.4 0.4 0.45" ambient="0.12 0.12 0.15" specular="0 0 0"/>
+    <rgba haze="0.0 0.0 0.0 0"/>
     <global azimuth="-130" elevation="-20" offwidth="1280" offheight="720"/>
   </visual>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.05 0.05 0.07" rgb2="0 0 0" width="512" height="3072"/>
-    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
-             rgb1="0.42 0.42 0.45" rgb2="0.28 0.28 0.3" markrgb="0.65 0.65 0.65" width="300" height="300"/>
-    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.02 0.02 0.03" rgb2="0 0 0" width="512" height="3072"/>
+    <!-- Solid dark arena floor (no checkerboard everywhere). -->
+    <texture type="2d" name="arenafloor" builtin="flat" rgb1="0.13 0.13 0.15" width="256" height="256"/>
+    <material name="arenafloor" texture="arenafloor" texuniform="true" reflectance="0.05"/>
+    <!-- Ring canvas: lighter blue-gray boxing mat. -->
+    <texture type="2d" name="canvas" builtin="flat" rgb1="0.42 0.46 0.55" width="256" height="256"/>
+    <material name="canvas" texture="canvas" texuniform="true" reflectance="0.1"/>
     {r1_asset}
     {r2_asset}
   </asset>
 
   <worldbody>
-    <!-- Boxing-theater lighting: dark surroundings + a strong
-         overhead spotlight centered on the ring. -->
-    <light pos="0 0 3.2" dir="0 0 -1" directional="true"
-           diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3"/>
-    <light pos="-1.2 0 3.5" dir="0.3 0 -1" directional="false"
-           diffuse="0.55 0.55 0.6" specular="0.2 0.2 0.2"/>
-    <light pos="1.2 0 3.5" dir="-0.3 0 -1" directional="false"
-           diffuse="0.55 0.55 0.6" specular="0.2 0.2 0.2"/>
-    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+    <!-- Boxing-theater: dark surroundings + overhead spotlight on ring.
+         Fog for atmospheric depth (haze off; use explicit fog). -->
+    <light pos="0 0 3.4" dir="0 0 -1" directional="true"
+           diffuse="1.0 1.0 1.0" specular="0.4 0.4 0.4" castshadow="true"/>
+    <light pos="-1.5 0 3.8" dir="0.35 0 -1" directional="false"
+           diffuse="0.5 0.5 0.6" specular="0.25 0.25 0.3"/>
+    <light pos="1.5 0 3.8" dir="-0.35 0 -1" directional="false"
+           diffuse="0.5 0.5 0.6" specular="0.25 0.25 0.3"/>
+
+    <!-- Arena floor: solid dark, large (surrounding mat). -->
+    <geom name="floor" size="30 30 0.05" type="plane" material="arenafloor"/>
+
+    <!-- Ring canvas: a raised lighter platform at ring center so the
+         ring reads as a distinct boxing mat (not the void floor). -->
+    <geom name="ring_canvas" type="box" pos="0 0 0.02"
+          size="{half+0.3} {half+0.3} 0.02" material="canvas"
+          contype="0" conaffinity="0"/>
 
     {ring_geoms}
 
@@ -290,6 +301,31 @@ def build_arena(ring="ropes", half=2.4):
                 model.geom_rgba[i] = [1.0, 0.05, 0.05, 1.0]   # king: RED
             else:
                 model.geom_rgba[i] = [0.1, 0.4, 1.0, 1.0]     # challenger: BLUE
+
+    # --- FIGHTER BODY ACCENTS: give each robot a distinct color so they
+    #     read as KING (red) vs CHALLENGER (blue) fighters, not identical
+    #     gray mannequins. Torso + head get a strong accent; limbs get a
+    #     subtle tint. This is the biggest visual upgrade for broadcast.
+    KING_TORSO   = [0.85, 0.15, 0.15, 1.0]   # red
+    KING_LIMB    = [0.75, 0.25, 0.25, 1.0]
+    CHAL_TORSO   = [0.15, 0.4, 0.85, 1.0]    # blue
+    CHAL_LIMB    = [0.25, 0.45, 0.8, 1.0]
+    TORSO_NAMES = {"torso_link", "head_link"}
+    for i in range(model.ngeom):
+        nm = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
+        body = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY,
+                                  model.geom_bodyid[i]) or ""
+        is_king = body.startswith("r1_")
+        is_chal = body.startswith("r2_")
+        if not (is_king or is_chal):
+            continue
+        # strip prefix for name matching
+        short = body[3:] if body.startswith(("r1_", "r2_")) else body
+        if short in TORSO_NAMES:
+            model.geom_rgba[i] = KING_TORSO if is_king else CHAL_TORSO
+        elif short.endswith(("_link",)):
+            # limbs: subtle tint (legs/arms)
+            model.geom_rgba[i] = KING_LIMB if is_king else CHAL_LIMB
     # Stability for RL random exploration: the elliptic friction cone can
     # raise a rank-deficient sparse-Hessian FatalError on degenerate
     # contacts (random exploration hits these constantly). Looser
