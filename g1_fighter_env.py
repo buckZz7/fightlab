@@ -43,9 +43,9 @@ class G1FighterEnv(gym.Env):
 
     def __init__(self, balance_path=None, opponent_path=None,
                  max_steps=1500, randomize=True, motion_dir=None, demo=False,
-                 king=None):
+                 king=None, ring="ropes"):
         super().__init__()
-        self.model = build_arena(ring="ropes", half=2.4)
+        self.model = build_arena(ring=ring, half=2.4)
         self.data = mujoco.MjData(self.model)
         self.model.opt.timestep = DT
         self.frame_skip = FRAME_SKIP
@@ -119,12 +119,18 @@ class G1FighterEnv(gym.Env):
                   "right_shoulder_pitch_link", "left_elbow_link", "right_elbow_link"]
         for i, pfx in enumerate(["r1_", "r2_"]):
             self.pelvis_id.append(self.model.body(f"{pfx}pelvis").id)
+            # Fists = the WRIST's natural collision geoms (contype>0).
+            # RoboStriker uses the G1's wrist-end as the fist (no fake
+            # sphere, no finger bodies -- the wrist IS the hand).
             fg = []
             for side in ("left", "right"):
-                gid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM,
-                                         f"{pfx}{side}_fist_col")
-                if gid >= 0:
-                    fg.append(gid)
+                wb = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY,
+                                        f"{pfx}{side}_wrist_yaw_link")
+                if wb >= 0:
+                    for j in range(self.model.body_geomnum[wb]):
+                        gid = self.model.body_geomadr[wb] + j
+                        if self.model.geom_contype[gid] > 0:
+                            fg.append(gid)
             self.fist_geoms.append(fg)
             bodies = set()
             for nm in TORSO:

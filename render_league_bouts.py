@@ -23,7 +23,7 @@ def render_bout(spec_a, spec_b, balance, out, steps, king_of=None):
     """king_of: name of the king fighter among {spec_a, spec_b} -> its
     robot gets RED gloves (the other is the BLUE challenger)."""
     env = G1FighterEnv(balance_path=balance, opponent_path=None,
-                       max_steps=steps, randomize=False)
+                       max_steps=steps, randomize=False, ring="open")
     env.opponent = _load_entrant(spec_b, env, for_blue=True)
     # king role: red gloves to whichever entrant is the king.
     # r1 = red-side (drives via env.step), r2 = blue-side (opponent).

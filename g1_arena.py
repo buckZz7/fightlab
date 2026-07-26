@@ -77,26 +77,12 @@ def _strip_mujoco_wrapper(xml):
 
 
 def _add_fist_geoms(xml):
-    """Insert fist collision spheres (INVISIBLE, physics-only) on each
-    wrist_yaw_link body. NO visual gloves -- real robot fights (Unitree
-    G1 boxing, URKL) are bare-handed. The physics sphere drives damage;
-    the fighter's bare hand is what renders.
+    """NO fake fist sphere. The G1's wrist_yaw_link ALREADY has
+    collision geoms (size 0.06, same as a fist) -- the wrist-end IS
+    the bot's hand/fist. We punch with the wrist stub (the G1 has no
+    finger bodies to close into a fist). Damage detection uses the
+    wrist's own collision geoms, not an added sphere.
     """
-    fists = ""
-    for side in ("left", "right"):
-        # physics collision sphere (INVISIBLE -- alpha 0, still collides)
-        fists += (
-            f'<geom name="{side}_fist_col" type="sphere" '
-            f'class="wrist_motor" '
-            f'pos="0.05 0 0" size="0.06" mass="0.3" '
-            f'rgba="0 0 0 0" contype="1" conaffinity="1"/>'
-        )
-    # Insert fists right after each wrist_yaw_link body opening tag.
-    def _insert(m):
-        return m.group(0) + fists
-    xml = re.sub(
-        r'(<body[^>]*name="left_wrist_yaw_link"[^>]*>)',
-        lambda m: m.group(1) + fists, xml, count=1)
     return xml
 
 
@@ -345,7 +331,13 @@ def build_arena(ring="ropes", half=2.4):
         "r2_left_ankle_pitch_link", "r2_left_ankle_roll_link",
         "r2_right_ankle_pitch_link", "r2_right_ankle_roll_link",
     }
-    KEEP_COLLISION = TORSO_TARGET_BODIES | FOOT_BODIES
+    # Wrists = the bot's FISTS (RoboStriker: wrist-end is the hand;
+    # the G1 has no finger bodies). Keep collision so punches register.
+    WRIST_BODIES = {
+        "r1_left_wrist_yaw_link", "r1_right_wrist_yaw_link",
+        "r2_left_wrist_yaw_link", "r2_right_wrist_yaw_link",
+    }
+    KEEP_COLLISION = TORSO_TARGET_BODIES | FOOT_BODIES | WRIST_BODIES
     for i in range(model.ngeom):
         if model.geom_type[i] == mujoco.mjtGeom.mjGEOM_MESH:
             body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY,
