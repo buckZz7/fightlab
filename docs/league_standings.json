@@ -50,7 +50,34 @@
       ],
       "rounds": 2,
       "elo_red": 1516.0,
-      "elo_blue": 1484.0
+      "elo_blue": 1484.0,
+      "mp4": "bouts/fighter_v1_vs_scripted_jabbler.mp4",
+      "n_frames": 300,
+      "card": {
+        "rounds": 3,
+        "round_scores": [
+          [
+            10
+          ],
+          [
+            10
+          ]
+        ],
+        "total_points": [
+          10.0,
+          10.0
+        ],
+        "foul_points": [
+          0.0,
+          0.0
+        ],
+        "winner": 0,
+        "method": "DECISION",
+        "final_hp": [
+          100.0,
+          100.0
+        ]
+      }
     },
     {
       "red": "fighter_v1",
@@ -92,7 +119,34 @@
       ],
       "rounds": 2,
       "elo_red": 1557.7,
-      "elo_blue": 1486.0
+      "elo_blue": 1486.0,
+      "mp4": "bouts/fighter_v1_vs_scripted_defender.mp4",
+      "n_frames": 300,
+      "card": {
+        "rounds": 3,
+        "round_scores": [
+          [
+            10
+          ],
+          [
+            10
+          ]
+        ],
+        "total_points": [
+          10.0,
+          10.0
+        ],
+        "foul_points": [
+          0.0,
+          0.0
+        ],
+        "winner": 0,
+        "method": "DECISION",
+        "final_hp": [
+          100.0,
+          100.0
+        ]
+      }
     },
     {
       "red": "fighter_v1",
@@ -134,7 +188,34 @@
       ],
       "rounds": 2,
       "elo_red": 1594.4,
-      "elo_blue": 1487.7
+      "elo_blue": 1487.7,
+      "mp4": "bouts/fighter_v1_vs_scripted_balanced.mp4",
+      "n_frames": 300,
+      "card": {
+        "rounds": 3,
+        "round_scores": [
+          [
+            10
+          ],
+          [
+            10
+          ]
+        ],
+        "total_points": [
+          10.0,
+          10.0
+        ],
+        "foul_points": [
+          0.0,
+          0.0
+        ],
+        "winner": 0,
+        "method": "DECISION",
+        "final_hp": [
+          100.0,
+          100.0
+        ]
+      }
     },
     {
       "red": "fighter_v1",
@@ -176,7 +257,34 @@
       ],
       "rounds": 2,
       "elo_red": 1626.8,
-      "elo_blue": 1489.2
+      "elo_blue": 1489.2,
+      "mp4": "bouts/fighter_v1_vs_scripted_pd.mp4",
+      "n_frames": 300,
+      "card": {
+        "rounds": 3,
+        "round_scores": [
+          [
+            10
+          ],
+          [
+            10
+          ]
+        ],
+        "total_points": [
+          10.0,
+          10.0
+        ],
+        "foul_points": [
+          0.0,
+          0.0
+        ],
+        "winner": 0,
+        "method": "DECISION",
+        "final_hp": [
+          100.0,
+          100.0
+        ]
+      }
     },
     {
       "red": "fighter_v1",
