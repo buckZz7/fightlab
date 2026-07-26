@@ -81,22 +81,23 @@ class ShadowBoxer:
         arm[0] = -0.7;  arm[3] = 1.3      # L guard (fwd + bent)
         arm[7] = -0.7;  arm[10] = 1.3     # R guard
 
-        # PUNCH: lead arm FULLY extends (shoulder -1.3, elbow
-        # straightens to ~0.1) on the attack envelope.
+        # PUNCH: lead arm extends forward (shoulder -1.0 max, elbow
+        # straightens to ~0.1). Cap at -1.0 so the arm drives FORWARD
+        # at the opponent, not up toward the ceiling at peak.
         atk = max(0.0, math.sin(p)) ** 2
         if self.lead == 1:  # red throws RIGHT cross
-            arm[7] = -0.7 - 0.6 * atk         # shoulder drives forward
-            arm[10] = 1.3 - 1.2 * atk        # elbow straightens
+            arm[7] = -0.7 - 0.3 * atk         # shoulder drives forward (cap -1.0)
+            arm[10] = 1.3 - 1.2 * atk         # elbow straightens
         else:               # blue throws LEFT jab
-            arm[0] = -0.7 - 0.6 * atk
+            arm[0] = -0.7 - 0.3 * atk
             arm[3] = 1.3 - 1.2 * atk
         # COUNTER from rear arm on off-beat.
         rear = max(0.0, math.sin(p + math.pi)) ** 2
         if self.lead == 1:
-            arm[0] = -0.7 - 0.5 * rear
+            arm[0] = -0.7 - 0.3 * rear
             arm[3] = 1.3 - 1.1 * rear
         else:
-            arm[7] = -0.7 - 0.5 * rear
+            arm[7] = -0.7 - 0.3 * rear
             arm[10] = 1.3 - 1.1 * rear
 
         # Footwork: shuffle forward toward center, weave a little.
