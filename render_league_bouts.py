@@ -36,10 +36,11 @@ def render_bout(spec_a, spec_b, balance, out, steps, king_of=None):
 
     cam = mujoco.MjvCamera()
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    # Broadcast hero angle: elevated 3/4 diagonal, shows ring depth +
-    # footwork + ropes. az=30 el=25 (vision-verified broadcast look).
-    cam.azimuth = 30.0; cam.elevation = 25.0; cam.distance = 6.0
-    cam.lookat[:] = [-0.15, 0, 0.9]
+    # SIDE-ON broadcast view: bots face each other on the X axis, so a
+    # side view (az=90, looking along Y) shows BOTH in profile facing
+    # each other -- the classic boxing broadcast angle. Elevated 18.
+    cam.azimuth = 90.0; cam.elevation = 18.0; cam.distance = 7.0
+    cam.lookat[:] = [-0.15, 0, 0.85]
     rend = mujoco.Renderer(env.model, height=540, width=960)
 
     frames = []

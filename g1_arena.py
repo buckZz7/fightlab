@@ -121,21 +121,21 @@ def _ring_geoms(ring, half):
     # 'ropes' (default): 4 padded corner posts (hard) + 4 rope levels (soft)
     h = half
     g = []
-    # Corner posts: padded cylinders at the 4 corners ONLY. NEAR-BLACK
-    # (charcoal) so they read clean against the dark theater and don't
-    # fight the glove colors. Slightly inset so they frame, not block.
+    # Corner posts: padded cylinders at the 4 corners ONLY. Dark gray
+    # (readable against the spotlight, not near-black-invisible) so the
+    # ring reads as a silhouette. Slightly inset so they frame, not block.
     inset = 0.12
     post_specs = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
     for sx, sy in post_specs:
         g.append(
             f'<geom name="post_{sx}_{sy}" '
             f'type="cylinder" pos="{sx*(h-inset)} {sy*(h-inset)} {POST_H/2}" '
-            f'size="{POST_R} {POST_H/2} 0" rgba="0.12 0.12 0.14 1" '
+            f'size="{POST_R} {POST_H/2} 0" rgba="0.30 0.30 0.33 1" '
             f'contype="1" conaffinity="1"/>')
-    # Ropes: THICK solid tubes, NEAR-BLACK (charcoal) vinyl so they
-    # read as a real ring silhouette against the spotlight, not a
-    # colored cage. Gloves (red/blue) are the only color accent.
-    rope_rgba = "0.13 0.13 0.15 1"
+    # Ropes: THICK solid tubes, dark gray vinyl (readable silhouette
+    # against the spotlight -- near-black vanished at broadcast angle).
+    # Gloves (red/blue) are the color accent.
+    rope_rgba = "0.28 0.28 0.31 1"
     for lvl in ROPE_HEIGHTS:
         # North/South (along X) at y=+/-h
         g.append(
