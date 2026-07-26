@@ -135,7 +135,7 @@ class G1BalanceEnv(gym.Env):
         up = _quat_up(quat)
 
         reward = 0.0
-        reward += np.exp(-((z - STAND_Z) ** 2) / 0.02)   # height (tighter)
+        reward += np.exp(-((z - STAND_Z) ** 2) / 0.01)   # height (tighter)
         reward += 0.5 * max(0.0, up)                          # upright
         # discourage drift/sag: penalize torso linear+angular velocity
         lin = np.linalg.norm(self.data.qvel[3:6])
@@ -145,10 +145,9 @@ class G1BalanceEnv(gym.Env):
         # FOOT CONTACT (plant feet on floor -- without it PD sinks)
         fc = self._foot_contact_count()
         reward += 0.1 * min(fc, 2)   # up to +0.2 for both feet planted
-        # ACTION SMOOTHNESS (HoST: L2 on delta-action prevents oscillation/sag)
-        if hasattr(self, "_prev_act"):
-            reward -= 0.01 * float(np.sum((act - self._prev_act) ** 2))
-        self._prev_act = act.copy()
+        # NOTE: no action-smoothness term here -- it collapses entropy and
+        # prevents the policy from learning ACTIVE balance (exploration).
+        # Smoothness is for the fighter (jitter punches), not the balancer.
 
         terminated = z < FALL_Z
         truncated = self.step_count >= self.max_steps

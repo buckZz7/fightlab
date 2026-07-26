@@ -55,7 +55,7 @@ def _preflight():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--steps", type=int, default=1_000_000)
+    ap.add_argument("--steps", type=int, default=2_000_000)
     ap.add_argument("--out", default="models/balance_v1")
     ap.add_argument("--max_steps", type=int, default=1500)
     ap.add_argument("--randomize", action="store_true", default=True)
@@ -94,7 +94,7 @@ def main():
         n_epochs=10,
         learning_rate=3e-4,
         gamma=0.99,
-        ent_coef=0.005,
+        ent_coef=0.02,
         vf_coef=0.5,
         max_grad_norm=0.5,
         verbose=1,
