@@ -15,7 +15,7 @@ r2 = frozen balance stander (or a loaded opponent for bout mode).
 This is INDEPENDENT of the running balance training -- it
 just needs balance_v1.zip to exist when we launch it.
 """
-import os, sys, glob
+import os, sys, glob, math
 sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault("MUJOCO_GL", "osmesa")
 import numpy as np
@@ -42,7 +42,7 @@ class G1FighterEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, balance_path=None, opponent_path=None,
-                 max_steps=1500, randomize=True, motion_dir=None):
+                 max_steps=1500, randomize=True, motion_dir=None, demo=False):
         super().__init__()
         self.model = build_arena(ring="ropes", half=2.4)
         self.data = mujoco.MjData(self.model)
@@ -50,6 +50,10 @@ class G1FighterEnv(gym.Env):
         self.frame_skip = FRAME_SKIP
         self.max_steps = max_steps
         self.randomize = randomize
+        # demo mode: apply walk as visible leg motion + larger arm
+        # residual scale so scripted punches/footwork actually SHOW.
+        # Never set by training (fighters learn small residuals).
+        self.demo = demo
 
         # Capture fighters use HOME as the balance base (NOT self.native).
         # The balance policy is TRAINED relative to HOME (g1_balance_env:
@@ -152,8 +156,8 @@ class G1FighterEnv(gym.Env):
     def _get_obs(self, agent=0):
         off = 0 if agent == 0 else 36
         qp = self.data.qpos[off:off + 36]
-        # qvel free joint is 6 (not 7) -> qvel starts 1 index earlier for r2
-        qv_off = off + 6 - (1 if off > 0 else 0)
+        # qvel stride is 35 (free joint = 6 vel DOF). qpos_off - 1 = qvel_off.
+        qv_off = (off - 1) if off > 0 else 0
         qv = self.data.qvel[qv_off:qv_off + 35]
         quat = qp[3:7]
         angvel = qv[3:6]
@@ -179,7 +183,9 @@ class G1FighterEnv(gym.Env):
         """obs for the frozen balance policy (65-dim: quat,angvel,jrel,jvel)."""
         off = 0 if agent == 0 else 36
         qp = self.data.qpos[off:off + 36]
-        qv_off = off + 6 - (1 if off > 0 else 0)
+        # qvel stride is 35 per robot (free joint = 6 vel DOF, not 7):
+        # r1 qvel[0:35], r2 qvel[35:70]. qpos_off - 1 = qvel_off.
+        qv_off = (off - 1) if off > 0 else 0
         qv = self.data.qvel[qv_off:qv_off + 35]
         return np.concatenate([qp[3:7], qv[3:6], qp[7:36] - self.native, qv[6:35]]).astype(np.float64)
 
@@ -252,23 +258,56 @@ class G1FighterEnv(gym.Env):
                         [2*(x*y+w*z), 1-2*(x*x+z*z), 2*(y*z-w*x)],
                         [2*(x*z-w*y), 2*(y*z+w*x), 1-2*(x*x+y*y)]])
 
+    def _walk_legs(self, walk_cmd, t, off):
+        """Convert (vx,vy,wz) walk cmd -> leg-joint target deltas.
+
+        Legs are joints 7:15 (8 joints: L/R hip_pitch, hip_roll,
+        knee, ankle_pitch, ankle_roll). A simple alternating
+        stepping gait: hip_pitch + knee swing out of phase L/R,
+        wz pivots the hips, vx scales stride. Returns 8-vec.
+        Used by demo footwork (and is the real footwork path the
+        walk-cmd reward was always expecting but never wired).
+        """
+        vx, vy, wz = walk_cmd
+        s = math.sin(t * 2.5)
+        c = math.sin(t * 2.5 + math.pi)  # opposite leg phase
+        stride = 0.5 * vx
+        swing = 0.6 * abs(vx)
+        d = np.zeros(8)
+        d[0] = stride * s          # L hip pitch
+        d[2] = swing * max(0.0, -s) + 0.25  # L knee lifts on back-swing
+        d[4] = stride * c          # R hip pitch
+        d[6] = swing * max(0.0, -c) + 0.25  # R knee lifts
+        d[1] = 0.15 * vy           # L hip roll (lateral)
+        d[5] = -0.15 * vy          # R hip roll
+        d[3] = -0.25 * wz          # L ankle pivot
+        d[7] = 0.25 * wz           # R ankle pivot
+        return d
+
     def step(self, action):
         arm_action = np.clip(action[:N_SKILL], -1, 1)
         walk_cmd = np.clip(action[N_SKILL:], -1, 1)
         walk_scaled = walk_cmd * np.array([0.5, 0.3, 1.0])
         opp_action = self._opp_action()
 
-        actions = [arm_action, opp_action[:N_SKILL] if len(opp_action) > N_SKILL else opp_action]
+        arm_scale = 1.5 if self.demo else RESIDUAL_SCALE
+        t = self.step_count * DT * self.frame_skip
+
+        # r1 walk -> leg targets (was dead code; now applied)
+        leg1 = self._walk_legs(walk_scaled, t, off=0) if self.demo else np.zeros(8)
+        # r2 walk (opponent)
         opp_walk = opp_action[N_SKILL:] * np.array([0.5, 0.3, 1.0]) if self.opponent else np.zeros(3)
+        leg2 = self._walk_legs(opp_walk, t, off=36) if self.demo else np.zeros(8)
 
         for _ in range(self.frame_skip):
-            for agent in range(2):
-                raw = actions[agent][:N_SKILL] * RESIDUAL_SCALE
-                self._residuals[agent] += 0.25 * (raw - self._residuals[agent])
             # r1: frozen balance residual + arm residual
             bal_act = self.balance.predict(self._bal_obs(0), deterministic=True)[0] if self.balance else np.zeros(29)
-            target = bal_act * 0.40 + self.native   # self.native == HOME (balance base)
-            target[15:29] += self._residuals[0]
+            target = bal_act * 0.40 + self.native   # self.native == HOME
+            target[22:36] += self._residuals[0]   # ARM joints (22:36), NOT 15:29
+            if self.demo:
+                # balance leg target overpowers small walk deltas;
+                # blend walk IN (60%) so footwork actually shows.
+                target[7:15] = target[7:15] * 0.4 + (self.native[7:15] + leg1) * 0.6
             kp = getattr(self, "rng_kp", KP)
             kd = getattr(self, "rng_kd", KD)
             tau1 = kp * (target - self.data.qpos[7:36]) - kd * self.data.qvel[6:35]
@@ -278,6 +317,8 @@ class G1FighterEnv(gym.Env):
                 bal_act2 = self.balance.predict(self._bal_obs(1), deterministic=True)[0] if self.balance else np.zeros(29)
                 t2 = bal_act2 * 0.40 + self.native
                 t2[15:29] += self._residuals[1]
+                if self.demo:
+                    t2[7:15] += leg2
                 tau2 = kp * (t2 - self.data.qpos[43:72]) - kd * self.data.qvel[41:70]
                 self._apply_control(tau2, slice(29, 58))
             else:
@@ -285,9 +326,16 @@ class G1FighterEnv(gym.Env):
                 self._apply_control(tau2, slice(29, 58))
             mujoco.mj_step(self.model, self.data, 1)
 
+        # residual update (lerp toward arm action * scale)
+        for agent in range(2):
+            raw = (arm_action if agent == 0 else opp_action[:N_SKILL]) * arm_scale
+            lerp = 0.5 if self.demo else 0.25
+            self._residuals[agent] += lerp * (raw - self._residuals[agent])
+
         self.step_count += 1
         self._update_damage()
-        # motion-match bonus (clean punch shape) -- coach tracks active punch.
+
+        z0 = self._pelvis_z(0)
         # Activate coach when the arm residual is large (bot is throwing);
         # pick the clip whose shape best matches current arm pose.
         arm_res = self._residuals[0]

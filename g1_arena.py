@@ -234,7 +234,7 @@ def build_arena(ring="ropes", half=2.4):
   <visual>
     <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
     <rgba haze="0.15 0.25 0.35 1"/>
-    <global azimuth="-130" elevation="-20"/>
+    <global azimuth="-130" elevation="-20" offwidth="1280" offheight="720"/>
   </visual>
 
   <asset>
