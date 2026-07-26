@@ -77,13 +77,10 @@ def _strip_mujoco_wrapper(xml):
 
 
 def _add_fist_geoms(xml):
-    """Insert fist collision spheres (INVISIBLE, physics-only) + a
-    visible boxing-glove capsule (visual, no collision) on each
-    wrist_yaw_link body.
-
-    The physics sphere (fist_col) drives damage/collision -- keep it
-    but hide it. The visual glove (fist_vis) is a capsule shaped like
-    a boxing glove, contype=0 (no physics), colored king/challenger.
+    """Insert fist collision spheres (INVISIBLE, physics-only) on each
+    wrist_yaw_link body. NO visual gloves -- real robot fights (Unitree
+    G1 boxing, URKL) are bare-handed. The physics sphere drives damage;
+    the fighter's bare hand is what renders.
     """
     fists = ""
     for side in ("left", "right"):
@@ -94,21 +91,9 @@ def _add_fist_geoms(xml):
             f'pos="0.05 0 0" size="0.06" mass="0.3" '
             f'rgba="0 0 0 0" contype="1" conaffinity="1"/>'
         )
-        # VISUAL boxing glove: a capsule, longer in the punch direction,
-        # rounded, no collision. Reads as a glove, not a ball.
-        fists += (
-            f'<geom name="{side}_fist_vis" type="capsule" '
-            f'class="wrist_motor" '
-            f'pos="0.05 0 0" size="0.075 0.10" euler="0 1.5708 0" '
-            f'rgba="0.6 0.1 0.1 1" contype="0" conaffinity="0" mass="0"/>'
-        )
     # Insert fists right after each wrist_yaw_link body opening tag.
-    # The robot XML has <body name="..._wrist_yaw_link" ...>. We insert
-    # the fist geom as the first child.
     def _insert(m):
         return m.group(0) + fists
-    # match each wrist_yaw_link body start; insert fists once (left+right)
-    # by replacing the FIRST wrist_yaw_link occurrence with both fists.
     xml = re.sub(
         r'(<body[^>]*name="left_wrist_yaw_link"[^>]*>)',
         lambda m: m.group(1) + fists, xml, count=1)
@@ -227,6 +212,9 @@ def build_arena(ring="ropes", half=2.4):
     r2_body = r2_world.replace('pos="0 0 0.793"', 'pos="0.3 0 0.793"')
 
     ring_geoms = _ring_geoms(ring, half)
+    # Street fight: NO ring canvas/platform (feet-sink bug + no ring).
+    # Just the default checkerboard floor.
+    canvas_geom = ""
 
     combined = f"""<mujoco model="g1_boxing_arena">
   <compiler angle="radian" meshdir="{MESH_DIR}" autolimits="true"/>
@@ -287,11 +275,7 @@ def build_arena(ring="ropes", half=2.4):
     <!-- DEFAULT checkerboard environment floor (unchanged). -->
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
-    <!-- Boxing ring platform ON TOP of the default floor: raised
-         lighter canvas so the ring reads as a distinct boxing mat. -->
-    <geom name="ring_canvas" type="box" pos="0 0 0.02"
-          size="{half+0.3} {half+0.3} 0.02" material="canvas"
-          contype="0" conaffinity="0"/>
+    {canvas_geom}
 
     {ring_geoms}
 
@@ -310,18 +294,21 @@ def build_arena(ring="ropes", half=2.4):
 
     model = mujoco.MjModel.from_xml_string(combined)
     model.opt.timestep = DT
-    # --- FIGHTER GLOVES: the VISUAL glove (fist_vis capsule) gets the
-    #     king/challenger color; the physics sphere (fist_col) stays
-    #     INVISIBLE (alpha 0) so damage/collision is unchanged.
-    #     Bodies stay the G1's NATURAL silver/white (accurate to the
-    #     real robot) -- gloves are the ONLY red/blue differentiator.
+    # --- FIGHTER DISTINCTION: natural G1 bodies, NO gloves (street
+    #     fight / real robot combat like Unitree G1 boxing). The
+    #     physics fist sphere (fist_col) stays INVISIBLE for damage.
+    #     King vs challenger distinction: a small HEADBAND accent
+    #     (colored band on the head) -- subtle, not painted bodies.
     for i in range(model.ngeom):
         name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
-        if name.endswith("_fist_vis"):
-            if name.startswith("r1_"):
-                model.geom_rgba[i] = [0.9, 0.05, 0.08, 1.0]   # king: deep RED glove
-            else:
-                model.geom_rgba[i] = [0.1, 0.4, 1.0, 1.0]     # challenger: BLUE glove
+        body = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY,
+                                  model.geom_bodyid[i]) or ""
+        # headband: color the head geom of each robot king=red/chal=blue
+        if body.endswith("head_link") or body.endswith("_head"):
+            if body.startswith("r1_"):
+                model.geom_rgba[i] = [0.85, 0.1, 0.1, 1.0]   # king: RED headband
+            elif body.startswith("r2_"):
+                model.geom_rgba[i] = [0.15, 0.4, 0.95, 1.0]  # challenger: BLUE headband
 
     # --- FIGHTER BODY COLOR: REVERTED -- bodies stay the G1's natural
     #     silver/white (accurate to the real robot). Only the gloves
