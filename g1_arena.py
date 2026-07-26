@@ -77,14 +77,30 @@ def _strip_mujoco_wrapper(xml):
 
 
 def _add_fist_geoms(xml):
-    """Insert fist collision spheres on the wrist_yaw_link bodies."""
+    """Insert fist collision spheres (INVISIBLE, physics-only) + a
+    visible boxing-glove capsule (visual, no collision) on each
+    wrist_yaw_link body.
+
+    The physics sphere (fist_col) drives damage/collision -- keep it
+    but hide it. The visual glove (fist_vis) is a capsule shaped like
+    a boxing glove, contype=0 (no physics), colored king/challenger.
+    """
     fists = ""
     for side in ("left", "right"):
+        # physics collision sphere (INVISIBLE -- alpha 0, still collides)
         fists += (
             f'<geom name="{side}_fist_col" type="sphere" '
             f'class="wrist_motor" '
             f'pos="0.05 0 0" size="0.06" mass="0.3" '
-            f'rgba="1 0 0 0.5" contype="1" conaffinity="1"/>'
+            f'rgba="0 0 0 0" contype="1" conaffinity="1"/>'
+        )
+        # VISUAL boxing glove: a capsule, longer in the punch direction,
+        # rounded, no collision. Reads as a glove, not a ball.
+        fists += (
+            f'<geom name="{side}_fist_vis" type="capsule" '
+            f'class="wrist_motor" '
+            f'pos="0.05 0 0" size="0.075 0.10" euler="0 1.5708 0" '
+            f'rgba="0.6 0.1 0.1 1" contype="0" conaffinity="0" mass="0"/>'
         )
     # Insert fists right after each wrist_yaw_link body opening tag.
     # The robot XML has <body name="..._wrist_yaw_link" ...>. We insert
@@ -290,14 +306,12 @@ def build_arena(ring="ropes", half=2.4):
 
     model = mujoco.MjModel.from_xml_string(combined)
     model.opt.timestep = DT
-    # --- FIGHTER GLOVE COLORS: king (r1) = RED gloves, challenger
-    #     (r2) = BLUE gloves. Keep SPHERE shape (damage/collision
-    #     physics unchanged) but bigger + saturated so they read as
-    #     gloves. Both hands are colored (G1 has a fist geom per wrist).
+    # --- FIGHTER GLOVES: the VISUAL glove (fist_vis capsule) gets the
+    #     king/challenger color; the physics sphere (fist_col) stays
+    #     INVISIBLE (alpha 0) so damage/collision is unchanged.
     for i in range(model.ngeom):
         name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
-        if name.endswith("_fist_col"):
-            model.geom_size[i] = [0.13, 0.13, 0.13]   # bigger gloves
+        if name.endswith("_fist_vis"):
             if name.startswith("r1_"):
                 model.geom_rgba[i] = [0.9, 0.05, 0.08, 1.0]   # king: deep RED
             else:
