@@ -91,37 +91,28 @@ def cmd_challenge(challenger_path, matches):
     if not os.path.exists(challenger_path):
         sys.exit(f"no such model: {challenger_path}")
 
+    # Track B bout needs a balance substrate.
+    bal = os.environ.get("BALANCE_PATH", "models/balance_v1")
+    if not os.path.exists(bal):
+        sys.exit(f"balance substrate missing: {bal} (set BALANCE_PATH or train it)")
+
     print(f"Challenger {challenger_path}")
     print(f"vs king gen{king['gen']} {king['path']} (ELO {king['elo']:.1f})")
     print(f"Series: {matches} matches, need >= {CROWN_THRESHOLD:.0%} to take the crown\n")
 
-    # challenger = red, king = blue. Run boxing-rules bout(s).
-    from g1_selfplay_env import make_g1_selfplay_env
-    red_wins = 0
-    blue_wins = 0
-    cards = []
-    for m in range(matches):
-        res = run_bout(
-            lambda: make_g1_selfplay_env(opponent_path2=king["path"], randomize=False),
-            challenger_path, king["path"],
-        )
-        cards.append(res)
-        if res["red_wins"] > 0:
-            red_wins += 1
-        else:
-            blue_wins += 1
-    res = {"red_wins": red_wins, "blue_wins": blue_wins, "draws": 0,
-           "cards": cards}
-    print(json.dumps({k: v for k, v in res.items() if k != "cards"}, indent=2))
-    print("\nSample card (match 0):")
-    print(json.dumps(cards[0]["card"], indent=2))
+    challenger = load_policy(challenger_path)
+    res = run_fighter_bout(challenger, king["path"], bal, matches=matches)
 
-    win_rate = res["red_wins"] / matches
+    red_wins = res["red_wins"]
+    blue_wins = res["blue_wins"]
+    print(json.dumps({"red_wins": red_wins, "blue_wins": blue_wins,
+                      "draws": res["draws"]}, indent=2))
+    print("\nSample card (match 0):")
+    print(json.dumps(res["cards"][0], indent=2))
+
+    win_rate = red_wins / matches
     e = expected(king["elo"], king["elo"])  # prior: equal
     score = win_rate
-    new_challenger_elo = king["elo"] + ELO_K * (score - e)
-    new_king_elo = king["elo"] + ELO_K * ((1 - score) - e)
-
     if win_rate >= CROWN_THRESHOLD:
         gen = king["gen"] + 1
         entry = {
@@ -129,14 +120,14 @@ def cmd_challenge(challenger_path, matches):
             "path": challenger_path,
             "elo": round(king["elo"] + ELO_K * (score - e) + ELO_K * 0.5, 1),
             "crowned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M"),
-            "cause": f"dethroned gen{king['gen']} {res['red_wins']}-{res['blue_wins']}",
+            "cause": f"dethroned gen{king['gen']} {red_wins}-{blue_wins}",
         }
         append_king(entry)
         print(f"\nNEW KING: gen{gen} {challenger_path}")
         print(f"ELO {king['elo']:.1f} -> {entry['elo']:.1f}")
     else:
         print(f"\nKing holds. Challenger needed {CROWN_THRESHOLD:.0%}, got {win_rate:.0%}.")
-        print(f"King ELO stays {king['elo']:.1f} (challenger est. {new_challenger_elo:.1f})")
+        print(f"King ELO stays {king['elo']:.1f}")
 
 
 def cmd_gauntlet(path, matches=10):
@@ -146,23 +137,19 @@ def cmd_gauntlet(path, matches=10):
         sys.exit("no kings yet.")
     opponents = [kings[0]] + kings[-2:] if len(kings) > 2 else kings
     seen, card = set(), []
-    from g1_selfplay_env import make_g1_selfplay_env
+    bal = os.environ.get("BALANCE_PATH", "models/balance_v1")
+    if not os.path.exists(bal):
+        sys.exit(f"balance substrate missing: {bal}")
+    model = load_policy(path)
     for k in opponents:
         if k["path"] in seen:
             continue
         seen.add(k["path"])
-        wins = 0; losses = 0; kos = 0
-        for _ in range(matches):
-            res = run_bout(
-                lambda: make_g1_selfplay_env(opponent_path2=k["path"], randomize=False),
-                path, k["path"],
-            )
-            if res["red_wins"] > 0:
-                wins += 1
-            else:
-                losses += 1
-            if res.get("method") in ("KO", "TKO"):
-                kos += 1
+        king_pol = load_policy(k["path"])
+        res = run_fighter_bout(model, k["path"], bal, matches=matches)
+        wins = res["red_wins"]; losses = res["blue_wins"]
+        kos = sum(1 for c in res["cards"] if c["winner"] == "red"
+                  and (c["dmg_to_king"] >= 100.0))
         ko_rate = kos / matches
         card.append({
             "opponent": k["path"],
@@ -170,7 +157,7 @@ def cmd_gauntlet(path, matches=10):
             "opponent_elo": k["elo"],
             "wins": wins,
             "losses": losses,
-            "draws": 0,
+            "draws": res["draws"],
             "ko_rate": ko_rate,
         })
         print(f"vs gen{k['gen']} (ELO {k['elo']:.0f}): "
@@ -185,12 +172,17 @@ def cmd_gauntlet(path, matches=10):
 # loaded the same way. This is the Gittensor ground-truth eval:
 # deterministic seeded bout, BoxingJudge-style scoring (damage + fall).
 # ----------------------------------------------------------------------------
-def run_fighter_bout(challenger_policy, king_policy, balance_path,
+def run_fighter_bout(challenger_policy, king_path, balance_path,
                      matches=1, max_steps=1500, seed=0):
-    """Run a bout series challenger(red) vs king(blue). Returns summary."""
+    """Run a bout series challenger(red) vs king(blue). Returns summary.
+
+    challenger_policy: loaded PPO model driving r1.
+    king_path: path to the king .zip (env loads it as r2 opponent).
+    balance_path: frozen balance substrate .zip.
+    """
     from g1_fighter_env import G1FighterEnv
 
-    env = G1FighterEnv(balance_path=balance_path, opponent_path=None,
+    env = G1FighterEnv(balance_path=balance_path, opponent_path=king_path,
                        max_steps=max_steps, randomize=False)
     red_wins = blue_wins = draws = 0
     cards = []
@@ -198,7 +190,6 @@ def run_fighter_bout(challenger_policy, king_policy, balance_path,
         o, _ = env.reset(seed=seed + m)
         for step in range(max_steps):
             a_red, _ = challenger_policy.predict(o, deterministic=True)
-            a_blue, _ = king_policy.predict(env._get_obs(1), deterministic=True)
             o, r, term, trunc, info = env.step(a_red)
             if term or trunc:
                 break
