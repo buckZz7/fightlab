@@ -21,6 +21,25 @@ from stable_baselines3.common.env_checker import check_env
 from g1_fighter_env import G1FighterEnv
 
 
+def _preflight():
+    """Gate: refuse to launch the 2M-step fighter run if the frozen
+    balance substrate can't stand inside G1FighterEnv. Catches the
+    SCALE_BAL / DR / model-quality bugs in ~20s, not after an hour.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "preflight_fighter",
+        os.path.join(os.path.dirname(__file__), "preflight_fighter.py"))
+    pf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pf)
+    ok = pf.check_fighter_stands()
+    if not ok:
+        print("[preflight] FAILED -- aborting fighter training "
+              "(fix frozen substrate first)")
+        sys.exit(1)
+    print("[preflight] fighter substrate OK -- proceeding")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--balance", default="models/balance_v1")
@@ -30,7 +49,12 @@ def main():
     ap.add_argument("--max_steps", type=int, default=1500)
     ap.add_argument("--randomize", action="store_true", default=True)
     ap.add_argument("--tb", default="")
+    ap.add_argument("--skip_preflight", action="store_true",
+                    help="skip the fighter-stand pre-flight gate")
     a = ap.parse_args()
+
+    if not a.skip_preflight:
+        _preflight()
 
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
 
