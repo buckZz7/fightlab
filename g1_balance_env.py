@@ -115,7 +115,13 @@ class G1BalanceEnv(gym.Env):
             t2 = self.loco.target
             tau2 = KP * (t2 - self.data.qpos[14:43]) - KD * self.data.qvel[13:42]
             self.data.ctrl[29:58] = np.clip(tau2, self.lo[29:], self.hi[29:])
-            mujoco.mj_step(self.model, self.data, 1)
+            try:
+                mujoco.mj_step(self.model, self.data, 1)
+            except mujoco.FatalError:
+                # Degenerate contact (rank-deficient Hessian). Treat as
+                # a fall -> terminate the episode rather than kill training.
+                self.data.qpos[2] = 0.0
+                self.data.qpos[9] = 0.0
 
         self.step_count += 1
         z = float(self.data.qpos[2])

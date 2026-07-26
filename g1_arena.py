@@ -239,6 +239,14 @@ def build_arena(ring="ropes", half=2.4):
 
     model = mujoco.MjModel.from_xml_string(combined)
     model.opt.timestep = DT
+    # Stability for RL random exploration: the elliptic friction cone can
+    # raise a rank-deficient sparse-Hessian FatalError on degenerate
+    # contacts (random exploration hits these constantly). Looser
+    # solver tolerance avoids the singular Hessian without the
+    # pyramidal-cone enum (which is a no-op in this mujoco build).
+    model.opt.tolerance = 1e-4
+    model.opt.iterations = 50
+    model.opt.integrator = mujoco.mjtIntegrator.mjINT_RK4
 
     # Performance: disable collision on mesh geoms EXCEPT torso-subtree bodies
     # (valid punch targets). Keeps fist-to-torso contact, drops leg/hip
