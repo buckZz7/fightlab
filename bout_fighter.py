@@ -70,28 +70,32 @@ class ShadowBoxer:
         #   4 L_wr_r  5 L_wr_p  6 L_wr_y
         #   7 R_sh_p  8 R_sh_r  9 R_sh_y 10 R_elb
         #  11 R_wr_r 12 R_wr_p 13 R_wr_y
-        # MuJoCo G1: shoulder_pitch POSITIVE = arm down/front.
-        # GUARD = raise (NEG shoulder_pitch) + bent elbow (~0.9).
-        arm[0] = -0.5;  arm[3] = 0.9     # L guard
-        arm[7] = -0.5;  arm[10] = 0.9    # R guard
+        # MuJoCo G1: shoulder_pitch NEGATIVE drives the arm
+        # FORWARD+toward opponent (FK-verified: sh=-1.3 -> wrist
+        # 0.33m ahead of pelvis, z raised to 0.98). ELBOW
+        # POSITIVE = bent; straight punch ~0.1, guard ~1.3.
+        # GUARD: shoulder moderately forward/up, elbow bent (hand
+        # comes up near chest, reads as a clear guard).
+        arm[0] = -0.7;  arm[3] = 1.3      # L guard (fwd + bent)
+        arm[7] = -0.7;  arm[10] = 1.3     # R guard
 
-        # PUNCH: lead arm extends (shoulder_pitch -> +0.4 forward,
-        # elbow -> ~0.05 straight) on the attack envelope.
+        # PUNCH: lead arm FULLY extends (shoulder -1.3, elbow
+        # straightens to ~0.1) on the attack envelope.
         atk = max(0.0, math.sin(p)) ** 2
         if self.lead == 1:  # red throws RIGHT cross
-            arm[7] = -0.5 + 0.9 * atk
-            arm[10] = 0.9 - 0.85 * atk
+            arm[7] = -0.7 - 0.6 * atk         # shoulder drives forward
+            arm[10] = 1.3 - 1.2 * atk        # elbow straightens
         else:               # blue throws LEFT jab
-            arm[0] = -0.5 + 0.9 * atk
-            arm[3] = 0.9 - 0.85 * atk
+            arm[0] = -0.7 - 0.6 * atk
+            arm[3] = 1.3 - 1.2 * atk
         # COUNTER from rear arm on off-beat.
         rear = max(0.0, math.sin(p + math.pi)) ** 2
         if self.lead == 1:
-            arm[0] = -0.5 + 0.7 * rear
-            arm[3] = 0.9 - 0.7 * rear
+            arm[0] = -0.7 - 0.5 * rear
+            arm[3] = 1.3 - 1.1 * rear
         else:
-            arm[7] = -0.5 + 0.7 * rear
-            arm[10] = 0.9 - 0.7 * rear
+            arm[7] = -0.7 - 0.5 * rear
+            arm[10] = 1.3 - 1.1 * rear
 
         # Footwork: shuffle forward toward center, weave a little.
         # bots start at x=-0.6 (r1) / +0.3 (r2); close to ~0.
