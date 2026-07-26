@@ -4,7 +4,16 @@ Builds a MuJoCo model with two G1 humanoids facing each other by loading
 the G1 spec and duplicating all bodies/joints/actuators with name prefixes.
 
 Uses the compiled-model string approach: load G1 scene XML, prefix all
-named references, combine two copies offset on the y-axis facing each other.
+named references, combine two copies offset on the X axis facing each other.
+
+Ring options (build_arena(ring=...)):
+  'ropes' (default) -> regulation SOFT square ring: 4 padded corner
+        posts (hard) + 3 rope levels (0.46/0.76/1.07 m) as compliant,
+        non-elastic contacts (solref 0.06/1, solimp 0.9/0.95/0.001).
+        Bots can lean/corner into ropes and get pushed back, but can't
+        walk through. This is the realistic boxing-ring behavior.
+  'walls'  -> old hard invisible walls (terminate-on-touch feel).
+  'open'   -> no boundary (infinite space).
 """
 import re
 import mujoco
@@ -30,39 +39,81 @@ RESIDUAL_SCALE = np.array(
 
 def _prefix_xml(xml, prefix):
     """Prefix all name= and mesh= references in a MuJoCo XML string."""
-    # Collect all unique names from name="..." attributes
     names = set(re.findall(r'name="([^"]+)"', xml))
-    # Also collect mesh="..." and material="..." references
     mesh_refs = set(re.findall(r'mesh="([^"]+)"', xml))
     mat_refs = set(re.findall(r'material="([^"]+)"', xml))
     all_refs = names | mesh_refs | mat_refs
 
-    # Don't prefix "floor" — we'll use our own floor, not the robot's
     all_refs.discard("floor")
 
-    # Sort by length (longest first) to avoid partial replacements
     for ref in sorted(all_refs, key=len, reverse=True):
-        # Replace name="ref" -> name="prefix+ref"
         xml = xml.replace(f'name="{ref}"', f'name="{prefix}{ref}"')
-        # Replace mesh="ref" -> mesh="prefix+ref"
         xml = xml.replace(f'mesh="{ref}"', f'mesh="{prefix}{ref}"')
-        # Replace material="ref" -> material="prefix+ref"
         xml = xml.replace(f'material="{ref}"', f'material="{prefix}{ref}"')
 
-    # Fix actuator joint="..." references
     joint_refs = set(re.findall(r'joint="([^"]+)"', xml))
-    joint_refs.discard("")  # safety
+    joint_refs.discard("")
     for ref in sorted(joint_refs, key=len, reverse=True):
         xml = xml.replace(f'joint="{ref}"', f'joint="{prefix}{ref}"')
 
-    # Remove the floor geom from the robot's worldbody (we have our own)
     xml = re.sub(r'<geom[^>]*name="(?:r1_|r2_)?floor"[^>]*/>', '', xml)
-
     return xml
 
 
-def build_arena():
-    """Build a two-G1 boxing arena model with fist collision spheres."""
+# Regulation rope heights (m) above mat: 18/30/42 inch.
+ROPE_HEIGHTS = (0.46, 0.76, 1.07)
+ROPE_SOLREF = "0.06 1"          # tc=0.06 (compliant), ratio=1 (no bounce)
+ROPE_SOLIMP = "0.9 0.95 0.001"  # smooth ramp, near-zero margin
+
+
+def _ring_geoms(ring, half):
+    if ring == "open":
+        return ""
+    if ring == "walls":
+        return """
+    <geom name="wall_n" type="box" pos="0 2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
+    <geom name="wall_s" type="box" pos="0 -2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
+    <geom name="wall_e" type="box" pos="2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
+    <geom name="wall_w" type="box" pos="-2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>"""
+    # 'ropes' (default): 4 padded corner posts (hard) + 3 rope levels (soft)
+    h = half
+    g = []
+    # Corner posts: solid, padded look, hard contact
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            g.append(
+                f'<geom name="post_{"p" if sx>0 else "n"}{"e" if sy>0 else "w"}" '
+                f'type="cylinder" pos="{sx*h} {sy*h} 0.7" size="0.05 0.7 0" '
+                f'rgba="0.1 0.3 0.9 0.7" contype="1" conaffinity="1"/>')
+    # Ropes: thin compliant bars along each edge at each height
+    for lvl in ROPE_HEIGHTS:
+        # North/South (along X) at y=+/-h
+        g.append(
+            f'<geom name="rope_n_{lvl}" type="box" pos="0 {h} {lvl}" '
+            f'size="{h} 0.015 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
+        g.append(
+            f'<geom name="rope_s_{lvl}" type="box" pos="0 {-h} {lvl}" '
+            f'size="{h} 0.015 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
+        # East/West (along Y) at x=+/-h
+        g.append(
+            f'<geom name="rope_e_{lvl}" type="box" pos="{h} 0 {lvl}" '
+            f'size="0.015 {h} 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
+        g.append(
+            f'<geom name="rope_w_{lvl}" type="box" pos="{-h} 0 {lvl}" '
+            f'size="0.015 {h} 0.015" rgba="0.9 0.1 0.1 0.7" '
+            f'contype="1" conaffinity="1" solref="{ROPE_SOLREF}" solimp="{ROPE_SOLIMP}"/>')
+    return "\n    ".join(g)
+
+
+def build_arena(ring="ropes", half=1.2):
+    """Build a two-G1 boxing arena model.
+
+    ring: 'ropes' (default, soft square ring) | 'walls' | 'open'
+    half: ring half-extent (m). Regulation ~16ft side => half 1.2.
+    """
     MESH_DIR = os.environ.get(
         "G1_MESH_DIR",
         "/opt/data/unitree_mujoco/unitree_robots/g1/meshes")
@@ -77,15 +128,9 @@ def build_arena():
             rgba=[1, 0, 0, 0.5], contype=1, conaffinity=1)
     xml = spec.to_xml()
 
-    # Create two prefixed copies
     xml_r1 = _prefix_xml(xml, "r1_")
     xml_r2 = _prefix_xml(xml, "r2_")
 
-    # Extract the body tree and assets from each
-    # We need: <asset> section, <worldbody> body tree, <actuator> section,
-    # <default> section (for joint/geom defaults)
-
-    # Strip the <mujoco> wrapper
     def extract_sections(x):
         asset = re.search(r'<asset>(.*?)</asset>', x, re.DOTALL)
         worldbody = re.search(r'<worldbody>(.*?)</worldbody>', x, re.DOTALL)
@@ -97,22 +142,19 @@ def build_arena():
             'actuator': actuator.group(1) if actuator else '',
             'default': default.group(1) if default else '',
         }
-
     r1 = extract_sections(xml_r1)
     r2 = extract_sections(xml_r2)
 
-    # Build combined XML
-    # Robot 1 faces +Y, robot 2 faces -Y, separated on X axis
-    # Offset pelvis positions: r1 at x=-0.6, r2 at x=0.6
-    # Rotate r2 180 degrees around Z so they face each other
     r1_body = r1['worldbody'].replace(
         'pos="0 0 0.793"',
         'pos="-0.6 0 0.793"'
     )
     r2_body = r2['worldbody'].replace(
         'pos="0 0 0.793"',
-        'pos="0.3 0 0.793"'  # close enough for punches to reach
+        'pos="0.3 0 0.793"'
     )
+
+    ring_geoms = _ring_geoms(ring, half)
 
     combined = f"""<mujoco model="g1_boxing_arena">
   <compiler angle="radian" meshdir="{MESH_DIR}" autolimits="true"/>
@@ -157,11 +199,7 @@ def build_arena():
     <light pos="0 0 3" dir="0 0 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
-    <!-- Arena boundary walls (invisible collision) -->
-    <geom name="wall_n" type="box" pos="0 2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
-    <geom name="wall_s" type="box" pos="0 -2.5 1" size="2.5 0.05 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
-    <geom name="wall_e" type="box" pos="2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
-    <geom name="wall_w" type="box" pos="-2.5 0 1" size="0.05 2.5 1" rgba="0.5 0.5 0.5 0.1" contype="0" conaffinity="0"/>
+    {ring_geoms}
 
     <!-- Robot 1 (red) -->
     {r1_body}
@@ -179,11 +217,9 @@ def build_arena():
     model = mujoco.MjModel.from_xml_string(combined)
     model.opt.timestep = DT
 
-    # Performance: disable collision on mesh geoms EXCEPT those on torso
-    # subtree bodies (which are valid punch targets). This keeps fist-to-
-    # torso contact working while removing the expensive mesh-mesh collision
-    # on legs/hips that we don't need.
-    # Fist spheres (type=SPHERE) and ankle spheres (type=SPHERE) keep collision.
+    # Performance: disable collision on mesh geoms EXCEPT torso-subtree bodies
+    # (valid punch targets). Keeps fist-to-torso contact, drops leg/hip
+    # mesh-mesh collision we don't need.
     TORSO_TARGET_BODIES = {
         "r1_torso_link", "r2_torso_link",
         "r1_left_shoulder_pitch_link", "r1_left_shoulder_roll_link",
