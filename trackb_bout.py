@@ -19,6 +19,7 @@ import mujoco
 import imageio.v2 as imageio
 from g1_arena import build_arena
 from g1moves_agent import G1MovesAgent, SKILLS
+from loco_base29 import HOME
 
 QPOS_OFF = [0, 7]
 QVEL_OFF = [0, 6]
@@ -40,11 +41,12 @@ def main():
     agents = [G1MovesAgent(a.motion, onnx_path=onnx),
               G1MovesAgent(a.motion, onnx_path=onnx)]
 
-    # init both from jab frame0 (balanced stance-ish)
-    jp0 = np.load(os.path.join(a.motion, "motion", "M_ShortMove12_quickjab.npz"))["joint_pos"][0]
-    for off in QPOS_OFF:
-        data.qpos[off+7 : off+7+29] = jp0
-    data.qpos[QPOS_OFF[1] + 0] = 0.9  # r2 forward
+    # init: root world pos from arena (r1 x=-0.6, r2 x=0.3, z=0.793),
+    # joints from HOME (the balanced stance LocoBase29 expects)
+    roots = [[-0.6, 0, 0.793], [0.3, 0, 0.793]]
+    for ai, off in enumerate(QPOS_OFF):
+        data.qpos[off+7 : off+7+3] = roots[ai]      # root x,y,z (world)
+        data.qpos[off+7+3 : off+7+29] = HOME[3:]   # joint targets as init pose
     mujoco.mj_forward(model, data)
 
     rend = mujoco.Renderer(model, height=480, width=640)
