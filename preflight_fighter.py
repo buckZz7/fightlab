@@ -23,11 +23,9 @@ FALL_Z = 0.40
 def check_fighter_stands():
     from g1_fighter_env import G1FighterEnv
 
-    if not os.path.exists(BALANCE):
-        print(f"[fighter-preflight] balance missing: {BALANCE} -- SKIP")
-        return True   # not our job to fail; the trainer needs it
-
-    env = G1FighterEnv(balance_path=BALANCE, opponent_path=None,
+    balance = BALANCE if os.path.exists(BALANCE) else None
+    mode = "frozen-balance-model" if balance else "PD-substrate (balance=None)"
+    env = G1FighterEnv(balance_path=balance, opponent_path=None,
                        max_steps=STAND_STEPS, randomize=False)
     o, _ = env.reset()
     assert o.shape == (85,), f"fighter obs shape {o.shape} != 85"
@@ -43,12 +41,12 @@ def check_fighter_stands():
             fell = i + 1
             break
     ok = fell is None
-    print(f"[fighter-preflight] frozen-substrate stand: "
+    print(f"[fighter-preflight] {mode} stand: "
           f"{'PASS' if ok else 'FAIL'} "
           f"(held {STAND_STEPS if ok else fell} steps, minz={minz:.3f})")
     if not ok:
-        print("  -> fighter env falls on the frozen balance substrate. "
-              "Check SCALE_BAL match / DR / balance model quality before training.")
+        print("  -> fighter env falls on the balance substrate. "
+              "Check SCALE_BAL match / DR / model quality before training.")
     return ok
 
 

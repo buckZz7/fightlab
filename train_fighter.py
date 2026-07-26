@@ -43,6 +43,8 @@ def _preflight():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--balance", default="models/balance_v1")
+    ap.add_argument("--pd", action="store_true",
+                    help="use PD-to-HOME substrate (balance=None) instead of a trained model")
     ap.add_argument("--opponent", default="")
     ap.add_argument("--steps", type=int, default=2_000_000)
     ap.add_argument("--out", default="models/fighter_v1")
@@ -54,6 +56,7 @@ def main():
                     help="skip the fighter-stand pre-flight gate")
     a = ap.parse_args()
 
+    balance = None if a.pd else a.balance
     if not a.skip_preflight:
         _preflight()
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
@@ -62,7 +65,7 @@ def main():
     from stable_baselines3.common.vec_env import SubprocVecEnv
     def _make():
         opp = a.opponent if a.opponent else None
-        return G1FighterEnv(balance_path=a.balance, opponent_path=opp,
+        return G1FighterEnv(balance_path=balance, opponent_path=opp,
                              max_steps=a.max_steps, randomize=a.randomize)
     if a.n_envs > 1:
         env = SubprocVecEnv([_make for _ in range(a.n_envs)])
@@ -71,7 +74,7 @@ def main():
 
     # env sanity
     try:
-        check_env(G1FighterEnv(balance_path=a.balance,
+        check_env(G1FighterEnv(balance_path=balance,
                                opponent_path=(a.opponent or None),
                                max_steps=a.max_steps, randomize=a.randomize),
                   warn=True)
@@ -93,7 +96,7 @@ def main():
         tensorboard_log=a.tb or None,
         device="auto",
     )
-    print(f"[train] balance={a.balance} steps={a.steps:,} out={a.out}")
+    print(f"[train] balance={'PD' if a.pd else a.balance} steps={a.steps:,} out={a.out}")
     model.learn(total_timesteps=a.steps, tb_log_name="fighter")
     model.save(a.out)
     print(f"[saved] {a.out}.zip")
