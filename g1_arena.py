@@ -291,25 +291,26 @@ def build_arena(ring="ropes", half=2.4):
     model = mujoco.MjModel.from_xml_string(combined)
     model.opt.timestep = DT
     # --- FIGHTER GLOVE COLORS: king (r1) = RED gloves, challenger
-    #     (r2) = BLUE gloves. LARGE + saturated so they read clearly
-    #     at broadcast distance (small fists were invisible on screen).
+    #     (r2) = BLUE gloves. Keep SPHERE shape (damage/collision
+    #     physics unchanged) but bigger + saturated so they read as
+    #     gloves. Both hands are colored (G1 has a fist geom per wrist).
     for i in range(model.ngeom):
         name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
         if name.endswith("_fist_col"):
-            model.geom_size[i] = [0.11, 0.11, 0.11]   # bigger gloves
+            model.geom_size[i] = [0.13, 0.13, 0.13]   # bigger gloves
             if name.startswith("r1_"):
-                model.geom_rgba[i] = [1.0, 0.05, 0.05, 1.0]   # king: RED
+                model.geom_rgba[i] = [0.9, 0.05, 0.08, 1.0]   # king: deep RED
             else:
                 model.geom_rgba[i] = [0.1, 0.4, 1.0, 1.0]     # challenger: BLUE
 
     # --- FIGHTER BODY ACCENTS: give each robot a distinct color so they
     #     read as KING (red) vs CHALLENGER (blue) fighters, not identical
     #     gray mannequins. Torso + head get a strong accent; limbs get a
-    #     subtle tint. This is the biggest visual upgrade for broadcast.
-    KING_TORSO   = [0.85, 0.15, 0.15, 1.0]   # red
-    KING_LIMB    = [0.75, 0.25, 0.25, 1.0]
-    CHAL_TORSO   = [0.15, 0.4, 0.85, 1.0]    # blue
-    CHAL_LIMB    = [0.25, 0.45, 0.8, 1.0]
+    #     subtle tint. DEEP crimson (not orange) / royal blue.
+    KING_TORSO   = [0.72, 0.05, 0.08, 1.0]   # deep crimson (less orange)
+    KING_LIMB    = [0.55, 0.15, 0.18, 1.0]
+    CHAL_TORSO   = [0.12, 0.35, 0.85, 1.0]    # royal blue
+    CHAL_LIMB    = [0.2, 0.4, 0.75, 1.0]
     TORSO_NAMES = {"torso_link", "head_link"}
     for i in range(model.ngeom):
         nm = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or ""
