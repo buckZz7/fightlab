@@ -23,13 +23,13 @@ SHAPE not just "approach and face", (c) balance penalty if pelvis drops.
 
 This reuses the proven-stable walker + existing damage/HP/KO/rules.
 """
-import os, sys, gym
+import os, sys, gymnasium as gym
 sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault("MUJOCO_GL", "osmesa")
 import numpy as np
 import mujoco
 from g1_arena import build_arena
-from loco_base29 import LocoBase29, HOME, KP, KD
+from loco_base29 import StandPD, HOME, KP, KD
 
 DT = 0.01
 FRAME_SKIP = 4          # 50 Hz control, 200 Hz sim -> wait, scene uses dt=0.005
@@ -88,8 +88,9 @@ class G1FullBodyBoxingEnv(gym.Env):
         self.hi = self.model.actuator_ctrlrange[:, 1].copy()
 
         # Balance bases (proven-stable SB3 walkers live in the policy; these
-        # are the PD substrate that kept Gen1-3 upright).
-        self.loco = [LocoBase29(), LocoBase29()]
+        # Balance substrate: StandPD (stable PD-to-HOME, no ONNX).
+        # The ONNX balance base is UNSTABLE (verified falls 2.8-13.4s).
+        self.loco = [StandPD(), StandPD()]
 
         # Opponent
         self.opponent = opponent_model
@@ -123,7 +124,7 @@ class G1FullBodyBoxingEnv(gym.Env):
                          "left_shoulder_pitch_link", "right_shoulder_pitch_link",
                          "left_elbow_link", "right_elbow_link"]
         for i, pfx in enumerate(["r1_", "r2_"]):
-            self.pelvis_id.append(self.model.body(f"{pfx}pelvis_link").id)
+            self.pelvis_id.append(self.model.body(f"{pfx}pelvis").id)
             self.torso_id.append(self.model.body(f"{pfx}{TORSO_BODY}").id)
             fg = []
             for side in ("left", "right"):
@@ -151,18 +152,13 @@ class G1FullBodyBoxingEnv(gym.Env):
 
     # ---- obs / step mirror g1_selfplay_env, plus move-ref tracking ----
     def _get_obs(self, agent=0):
-        qp = 7 + agent * 0   # single-robot view uses r1 prefix offset 0
-        # NOTE: g1_selfplay_env uses QPOS_OFFSET per agent; we keep r1 at 0,
-        # r2 at +7. For clarity reuse the same indexing as the parent.
+        # Per-robot qpos/qvel offsets: r1 at 0, r2 at +7.
         off = 0 if agent == 0 else 7
-        qv = 6 + (off - 7)  # qvel offset = off-1
-        qp = off
-        qv = off - 1
-        # own skill joints (14) + torso ori + hp + opp relative + contact
-        q = self.data.qpos[qp + 7 + 15: qp + 7 + 29]
-        qd = self.data.qvel[qv + 6 + 15: qv + 6 + 29]
-        quat = self.data.qpos[qp + 3: qp + 7]
-        omega = self.data.qvel[qv + 3: qv + 6]
+        # own skill joints (arm 14) + torso ori + hp + opp relative + contact
+        q = self.data.qpos[off + 7 + 15: off + 7 + 29]      # arm joints 15:29
+        qd = self.data.qvel[off + 6 + 15: off + 6 + 29]
+        quat = self.data.qpos[off + 3: off + 7]            # root quat
+        omega = self.data.qvel[off + 3: off + 6]             # root ang vel
         hp_self = np.array([self.hp[agent]])
         hp_opp = np.array([self.hp[1 - agent]])
         my_pel = self.data.xpos[self.pelvis_id[agent]]
@@ -204,9 +200,9 @@ class G1FullBodyBoxingEnv(gym.Env):
         mujoco.mj_resetData(self.model, self.data)
         # place bots: r1 at -0.6, r2 at 0.3 (square ring spacing)
         for ai, (x, pfx) in enumerate([(-0.6, "r1_"), (0.3, "r2_")]):
-            off = ai * 7
-            self.data.qpos[off + 7: off + 7 + 3] = [x, 0, 0.793]
-            self.data.qpos[off + 7 + 3: off + 7 + 29] = HOME[3:]
+            off = ai * 7                      # free-joint qpos offset (r1:0, r2:7)
+            self.data.qpos[off : off + 3] = [x, 0, 0.793]   # root x,y,z (world)
+            self.data.qpos[off + 3 : off + 29] = HOME[3:]   # 26 joint targets
         if self.randomize:
             self._randomize()
         mujoco.mj_forward(self.model, self.data)
@@ -247,13 +243,12 @@ class G1FullBodyBoxingEnv(gym.Env):
                 raw = actions[agent][:N_SKILL] * RESIDUAL_SCALE
                 self._residuals[agent] += 0.25 * (raw - self._residuals[agent])
             for agent in range(2):
-                qp = 7 + agent * 7
-                qv = 6 + agent * 7
-                self.loco[agent].update(self.data.qpos[qp:qp+36], self.data.qvel[qv:qv+35])
+                qp = agent * 7   # free-joint qpos offset: r1=0, r2=7
+                self.loco[agent].update(self.data.qpos, self.data.qvel, off=qp)
                 target = self.loco[agent].target.copy()
                 target[15:29] += self._residuals[agent]  # arm residuals
                 tau = self.loco[agent].pd_torque(
-                    self.data.qpos[qp:qp+36], self.data.qvel[qv:qv+35],
+                    self.data.qpos, self.data.qvel, off=qp,
                     target_override=target)
                 act_off = agent * 29
                 self.data.ctrl[act_off:act_off+29] = np.clip(tau, self.lo[act_off:act_off+29], self.hi[act_off:act_off+29])
@@ -306,7 +301,8 @@ class G1FullBodyBoxingEnv(gym.Env):
         fist_pos = self.data.xpos[fb]
         # body-frame velocity of fist
         fist_vel = self.data.cvel[fb][:3]
-        R = self._quat_to_rot(self.data.qpos[7*(1-agent)+3: 7*(1-agent)+7])
+        off = 7 if agent == 1 else 0
+        R = self._quat_to_rot(self.data.qpos[off + 3: off + 7])
         rel = opp_pel - fist_pos
         rel_dir = rel / (np.linalg.norm(rel) + 1e-6)
         return float(np.dot(fist_vel, rel_dir))
