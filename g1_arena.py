@@ -259,11 +259,16 @@ def build_arena(ring="ropes", half=2.4):
   </visual>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.02 0.02 0.03" rgb2="0 0 0" width="512" height="3072"/>
-    <!-- Solid dark arena floor (no checkerboard everywhere). -->
-    <texture type="2d" name="arenafloor" builtin="flat" rgb1="0.13 0.13 0.15" width="256" height="256"/>
-    <material name="arenafloor" texture="arenafloor" texuniform="true" reflectance="0.05"/>
-    <!-- Ring canvas: lighter blue-gray boxing mat. -->
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <!-- DEFAULT MuJoCo checkerboard environment floor (navy grid,
+         gradient skybox) -- unchanged, the classic look. -->
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+             rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8"
+             width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+              texrepeat="5 5" reflectance="0.2"/>
+    <!-- Ring canvas: a raised LIGHTER platform ON TOP of the default
+         checkerboard -- the distinct boxing mat. -->
     <texture type="2d" name="canvas" builtin="flat" rgb1="0.42 0.46 0.55" width="256" height="256"/>
     <material name="canvas" texture="canvas" texuniform="true" reflectance="0.1"/>
     {r1_asset}
@@ -271,8 +276,7 @@ def build_arena(ring="ropes", half=2.4):
   </asset>
 
   <worldbody>
-    <!-- Boxing-theater: dark surroundings + overhead spotlight on ring.
-         Fog for atmospheric depth (haze off; use explicit fog). -->
+    <!-- Overhead spotlight on ring, default skybox surroundings. -->
     <light pos="0 0 3.4" dir="0 0 -1" directional="true"
            diffuse="1.0 1.0 1.0" specular="0.4 0.4 0.4" castshadow="true"/>
     <light pos="-1.5 0 3.8" dir="0.35 0 -1" directional="false"
@@ -280,11 +284,11 @@ def build_arena(ring="ropes", half=2.4):
     <light pos="1.5 0 3.8" dir="-0.35 0 -1" directional="false"
            diffuse="0.5 0.5 0.6" specular="0.25 0.25 0.3"/>
 
-    <!-- Arena floor: solid dark, large (surrounding mat). -->
-    <geom name="floor" size="30 30 0.05" type="plane" material="arenafloor"/>
+    <!-- DEFAULT checkerboard environment floor (unchanged). -->
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
-    <!-- Ring canvas: a raised lighter platform at ring center so the
-         ring reads as a distinct boxing mat (not the void floor). -->
+    <!-- Boxing ring platform ON TOP of the default floor: raised
+         lighter canvas so the ring reads as a distinct boxing mat. -->
     <geom name="ring_canvas" type="box" pos="0 0 0.02"
           size="{half+0.3} {half+0.3} 0.02" material="canvas"
           contype="0" conaffinity="0"/>
