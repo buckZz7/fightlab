@@ -47,24 +47,31 @@ class ShadowBoxer:
       arm residual 14 -> HOME[15:29] (shoulders/elbows/wrists)
       walk cmd 3        -> (vx, vy, wz) * [0.5, 0.3, 1.0]
     """
-    def __init__(self, env, style="red"):
+    def __init__(self, env, style="red", profile="balanced"):
         self.env = env
         self.style = style
+        self.profile = profile
         # which side leads: red leads with RIGHT (cross), blue with LEFT (jab)
         self.lead = 0 if style == "blue" else 1  # 0=joint-block L, 1=R
         self.t = 0.0
         self.phase = 0.0 if style == "red" else math.pi  # desync the two
+        # profile tuning: punch cadence (rate), aggressiveness (walk), guard
+        if profile == "jabbler":      # fast jabs, closes distance hard
+            self.cadence = 3.2; self.walk_fwd = 0.6; self.punch_amp = 0.9
+        elif profile == "defender":   # guard-heavy, low aggression, counter
+            self.cadence = 1.6; self.walk_fwd = 0.15; self.punch_amp = 0.6
+        else:                          # balanced
+            self.cadence = 2.4; self.walk_fwd = 0.4; self.punch_amp = 0.8
 
     def predict(self, obs, deterministic=True):
         self.t += 1
         dt = self.env.model.opt.timestep * self.env.frame_skip
         # desync the two bots by PI so it reads as an EXCHANGE
         # (red punches while blue guards, then swap), not mirrored sync.
-        self.phase += dt * 2.4
+        self.phase += dt * self.cadence
         p = self.phase if self.style == "red" else self.phase + math.pi
 
         arm = np.zeros(14)
-        # Arm layout in HOME[15:29] (14 joints): pairs of
         arm = np.zeros(14)
         # Arm joints are qpos 22:36 (NOT 15:29). Layout
         # (arm action idx -> joint):
@@ -85,26 +92,28 @@ class ShadowBoxer:
         # straightens to ~0.1). Cap at -1.0 so the arm drives FORWARD
         # at the opponent, not up toward the ceiling at peak.
         atk = max(0.0, math.sin(p)) ** 2
+        amp = 0.3 * self.punch_amp
         if self.lead == 1:  # red throws RIGHT cross
-            arm[7] = -0.7 - 0.3 * atk         # shoulder drives forward (cap -1.0)
+            arm[7] = -0.7 - amp * atk         # shoulder drives forward (cap -1.0)
             arm[10] = 1.3 - 1.2 * atk         # elbow straightens
         else:               # blue throws LEFT jab
-            arm[0] = -0.7 - 0.3 * atk
+            arm[0] = -0.7 - amp * atk
             arm[3] = 1.3 - 1.2 * atk
         # COUNTER from rear arm on off-beat.
         rear = max(0.0, math.sin(p + math.pi)) ** 2
         if self.lead == 1:
-            arm[0] = -0.7 - 0.3 * rear
+            arm[0] = -0.7 - amp * rear
             arm[3] = 1.3 - 1.1 * rear
         else:
-            arm[7] = -0.7 - 0.3 * rear
+            arm[7] = -0.7 - amp * rear
             arm[10] = 1.3 - 1.1 * rear
 
         # Footwork: shuffle forward toward center, weave a little.
-        # bots start at x=-0.6 (r1) / +0.3 (r2); close to ~0.
-        walk = np.array([0.4 + 0.2 * math.sin(p * 0.5),   # vx: advance
-                         0.15 * math.sin(p * 0.9),            # vy: weave
-                         0.4 * math.sin(p * 0.4)])           # wz: pivot
+        # walk_fwd scales aggression (jabbler advances hard, defender
+        # stays planted and counters).
+        walk = np.array([self.walk_fwd + 0.2 * math.sin(p * 0.5),   # vx
+                         0.15 * math.sin(p * 0.9),                     # vy
+                         0.4 * math.sin(p * 0.4)])                    # wz
         act = np.concatenate([np.clip(arm, -1, 1), walk]).astype(np.float64)
         return act, None
 
