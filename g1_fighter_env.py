@@ -152,7 +152,9 @@ class G1FighterEnv(gym.Env):
     def _get_obs(self, agent=0):
         off = 0 if agent == 0 else 36
         qp = self.data.qpos[off:off + 36]
-        qv = self.data.qvel[off:off + 35]
+        # qvel free joint is 6 (not 7) -> qvel starts 1 index earlier for r2
+        qv_off = off + 6 - (1 if off > 0 else 0)
+        qv = self.data.qvel[qv_off:qv_off + 35]
         quat = qp[3:7]
         angvel = qv[3:6]
         jrel = qp[7:36] - self.native
@@ -177,7 +179,8 @@ class G1FighterEnv(gym.Env):
         """obs for the frozen balance policy (65-dim: quat,angvel,jrel,jvel)."""
         off = 0 if agent == 0 else 36
         qp = self.data.qpos[off:off + 36]
-        qv = self.data.qvel[off:off + 35]
+        qv_off = off + 6 - (1 if off > 0 else 0)
+        qv = self.data.qvel[qv_off:qv_off + 35]
         return np.concatenate([qp[3:7], qv[3:6], qp[7:36] - self.native, qv[6:35]]).astype(np.float64)
 
     def _opp_action(self):
@@ -222,11 +225,26 @@ class G1FighterEnv(gym.Env):
         opp_pel = self.data.xpos[self.pelvis_id[opp]]
         fist_pos = self.data.xpos[fb]
         fist_vel = self.data.cvel[fb][:3]
-        off = 7 if agent == 1 else 0
+        off = 36 if agent == 1 else 0
         R = self._quat_to_rot(self.data.qpos[off + 3:off + 7])
         rel = opp_pel - fist_pos
         rel_dir = rel / (np.linalg.norm(rel) + 1e-6)
         return float(np.dot(fist_vel, rel_dir))
+
+    def _foot_contact_count(self, agent=0):
+        """Count a bot's foot geoms touching a non-self body (the floor)."""
+        pfx = "r1_" if agent == 0 else "r2_"
+        fb = {pfx + "left_ankle_roll_link", pfx + "right_ankle_roll_link",
+              pfx + "left_ankle_pitch_link", pfx + "right_ankle_pitch_link"}
+        n = 0
+        for c in range(self.data.ncon):
+            b1 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY,
+                                   self.model.geom_bodyid[self.data.contact[c].geom1])
+            b2 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY,
+                                   self.model.geom_bodyid[self.data.contact[c].geom2])
+            if (b1 in fb and b2 not in fb) or (b2 in fb and b1 not in fb):
+                n += 1
+        return n
 
     def _quat_to_rot(self, q):
         w, x, y, z = q
@@ -249,7 +267,7 @@ class G1FighterEnv(gym.Env):
                 self._residuals[agent] += 0.25 * (raw - self._residuals[agent])
             # r1: frozen balance residual + arm residual
             bal_act = self.balance.predict(self._bal_obs(0), deterministic=True)[0] if self.balance else np.zeros(29)
-            target = bal_act * 0.40 + self.native   # MUST match g1_balance_env base (native) + SCALE_BAL (0.40)
+            target = bal_act * 0.40 + self.native   # self.native == HOME (balance base)
             target[15:29] += self._residuals[0]
             kp = getattr(self, "rng_kp", KP)
             kd = getattr(self, "rng_kd", KD)
@@ -286,26 +304,26 @@ class G1FighterEnv(gym.Env):
         else:
             self.coach.active = None
         self._coach_bonus = self.coach.step(arm_qpos, DT * self.frame_skip)
-        reward = self._compute_reward(0)
+        reward = self._compute_reward(0, action)
 
         z0 = self._pelvis_z(0)
         z1 = self._pelvis_z(1)
         terminated = z0 < 0.4 or z1 < 0.4
         truncated = self.step_count >= self.max_steps
         if terminated or truncated:
-            # RoboStriker terminal: opponent below h_min = win; self below = loss
-            if self.hp[1] <= 0:
-                reward += 25.0
-            elif self.hp[0] <= 0:
-                reward -= 25.0
-            elif z1 < 0.4 and z0 > 0.4:
-                reward += 25.0
-            elif z0 < 0.4 and z1 > 0.4:
-                reward -= 25.0
+            # RoboStriker terminal: opponent below h_min = win; self below = loss.
+            # Use a MODERATE bonus (not the old flat +25 which dwarfed the
+            # per-step shaping and biased toward degenerate rush-down). Scale
+            # by HP margin so a decisive KO beats a lucky stumble.
+            margin = (self.hp[0] - self.hp[1]) / MAX_HP   # +1 (won clean) .. -1
+            if self.hp[1] <= 0 or z1 < 0.4:
+                reward += 5.0 + 3.0 * max(0.0, margin)   # win
+            elif self.hp[0] <= 0 or z0 < 0.4:
+                reward -= 5.0 + 3.0 * max(0.0, -margin)  # loss
         info = {"hp_0": self.hp[0], "hp_1": self.hp[1], "pelvis_z_0": z0, "pelvis_z_1": z1}
         return self._get_obs(0), reward, terminated, truncated, info
 
-    def _compute_reward(self, agent=0):
+    def _compute_reward(self, agent=0, action=None):
         opp = 1 - agent
         reward = 0.0
         # --- Strike reward (RoboStriker: w_hit=50, gated force+speed) ---
@@ -328,13 +346,20 @@ class G1FighterEnv(gym.Env):
         face_dir = rel / (dist + 1e-6)
         facing = np.dot(R[:, 0], face_dir)
         reward += 1.2 * np.exp(-max(0.0, 1.0 - facing) / 0.5)
-        # --- Velocity-gated approach (RoboStriker: w_dist=1.5) ---
-        # reward only when moving TOWARD opponent (anti passive/spam)
+        # --- Velocity-gated approach (RoboStriker: w_dist=1.5, sigma=1.0,
+        #     v_th=0.8; reward only when moving TOWARD opponent in range) ---
         vel = self.data.cvel[self.pelvis_id[agent]][:3]  # world linear vel
         approach = max(0.0, np.dot(vel, face_dir))
-        reward += 1.5 * (1.0 if approach > 0.1 else 0.0) * np.exp(-abs(dist - 0.5) / 1.0)
+        in_range = np.exp(-abs(dist - 0.5) / 1.0)
+        reward += 1.5 * (1.0 if approach > 0.8 else 0.0) * in_range
         # --- Balance / keep-standing penalty ---
         reward -= 0.05 * max(0.0, 0.4 - self._pelvis_z(agent))
+        # --- FOOT PLANT (HoST: both feet down = stable, not hopping) ---
+        reward += 0.05 * min(self._foot_contact_count(agent), 2)
+        # --- ACTION SMOOTHNESS (HoST: L2 delta-action, prevents jitter punches) ---
+        if hasattr(self, "_prev_act"):
+            reward -= 0.01 * float(np.sum((action - self._prev_act) ** 2))
+        self._prev_act = action.copy()
         return float(reward)
 
     @property

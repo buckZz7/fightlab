@@ -72,7 +72,11 @@ class StandPD:
 
     def pd_torque(self, qpos, qvel, off=0, target_override=None):
         t = self.target if target_override is None else target_override
-        return KP * (t - qpos[off+7:off+36]) - KD * qvel[off+6:off+35]
+        n = len(KP)  # 29 joints
+        # qpos free joint = 7, qvel free joint = 6 -> qvel offset is 1 less
+        # than qpos offset for robots after the first.
+        qv_off = off + 6 - (1 if off > 0 else 0)
+        return KP * (t - qpos[off+7:off+7+n]) - KD * qvel[qv_off:qv_off+n]
 
     def reset(self):
         self.target = HOME.copy()
