@@ -16,19 +16,23 @@ Gains/SCALE/HOME from the unitree deploy config (deploy.yaml).
 import os
 import numpy as np
 
-# PD gains (per-joint, 29-DoF order: legs 0-11, waist 12-14,
-# left arm 15-21, right arm 22-28). From deploy.yaml [torso/leg/ankle/
-# arm/wrist_motor] classes.
-KP = np.array([40.2, 99.1, 40.2, 99.1, 28.5, 28.5,
-               40.2, 99.1, 40.2, 99.1, 28.5, 28.5,
-               40.2, 28.5, 28.5,
-               14.3, 14.3, 14.3, 14.3, 14.3, 16.8, 16.8,
-               14.3, 14.3, 14.3, 14.3, 14.3, 16.8, 16.8])
-KD = np.array([2.6, 6.3, 2.6, 6.3, 1.8, 1.8,
-               2.6, 6.3, 2.6, 6.3, 1.8, 1.8,
-               2.6, 1.8, 1.8,
-               0.9, 0.9, 0.9, 0.9, 0.9, 1.1, 1.1,
-               0.9, 0.9, 0.9, 0.9, 0.9, 1.1, 1.1])
+# PD gains (per-joint, 29-DoF order matching the model):
+#   legs 0-11 (hip_pitch,hip_roll,hip_yaw,knee,ankle_pitch,ankle_roll x2)
+#   waist 12-14 (yaw,roll,pitch)
+#   arms 15-28 (l_shoulder_p,r,y, l_elbow, l_wrist_r,p,y, r_shoulder..., r_elbow, r_wrist...)
+# VALUES: documented stiff gains (lerobot/unitree-g1-mujoco README,
+# NVIDIA GR00T spec). The OLD gains (40-99) were ~3x too soft and the
+# G1 collapsed instantly. Hip/Knee/Ankle/Waist per GR00T; arms moderate.
+KP = np.array([150, 150, 150, 300, 40, 40,        # L leg: hip,hip,hip,knee,ank,ank
+               150, 150, 150, 300, 40, 40,        # R leg
+               250, 250, 250,                      # waist yaw,roll,pitch
+               100, 100, 100, 100, 100, 10, 10,    # L arm: sh_p,sh_r,sh_y,elbow,wrist_r,wrist_p,wrist_y
+               100, 100, 100, 100, 100, 10, 10])   # R arm
+KD = np.array([2, 2, 2, 4, 2, 2,
+               2, 2, 2, 4, 2, 2,
+               5, 5, 5,
+               2, 2, 2, 2, 2, 2, 2,
+               2, 2, 2, 2, 2, 2, 2])
 
 # Standing pose (joint targets from neutral + slight knee/hip bend).
 # Matches the unitree HOME used by the deploy policy.

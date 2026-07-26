@@ -29,7 +29,8 @@ DT = 0.01
 FRAME_SKIP = 4
 N_ACT = 29
 N_OBS = 4 + 3 + 29 + 29
-SCALE_BAL = 0.10          # rad residual scale
+SCALE_BAL = 0.40          # rad residual scale (policy needs real authority
+                             # to actively balance; 0.10 was too weak)
 STAND_Z = 0.793
 FALL_Z = 0.40
 NATIVE_ROOT_X = [-0.6, 0.3]
@@ -131,6 +132,9 @@ class G1BalanceEnv(gym.Env):
         reward = 0.0
         reward += np.exp(-((z - STAND_Z) ** 2) / 0.05)   # height
         reward += 0.5 * max(0.0, up)                          # upright
+        # discourage drift/sag: penalize torso linear+angular velocity
+        lin = np.linalg.norm(self.data.qvel[3:6])
+        reward -= 0.02 * lin
         reward -= 0.005 * float(np.dot(act, act))                   # action cost
         reward -= 0.02 * max(0.0, 0.4 - z)                     # near-fall penalty
 
