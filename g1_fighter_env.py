@@ -273,15 +273,18 @@ class G1FighterEnv(gym.Env):
         c = math.sin(t * 2.5 + math.pi)  # opposite leg phase
         stride = 0.5 * vx
         swing = 0.6 * abs(vx)
-        d = np.zeros(8)
+        # target[0:12] = qpos[7:19] = L leg (0:6) + R leg (6:12):
+        #   [L_hip_p, L_hip_r, L_hip_y, L_knee, L_ank_p, L_ank_r,
+        #    R_hip_p, R_hip_r, R_hip_y, R_knee, R_ank_p, R_ank_r]
+        d = np.zeros(12)
         d[0] = stride * s          # L hip pitch
-        d[2] = swing * max(0.0, -s) + 0.25  # L knee lifts on back-swing
-        d[4] = stride * c          # R hip pitch
-        d[6] = swing * max(0.0, -c) + 0.25  # R knee lifts
+        d[3] = swing * max(0.0, -s) + 0.25  # L knee lifts
+        d[6] = stride * c          # R hip pitch
+        d[9] = swing * max(0.0, -c) + 0.25  # R knee lifts
         d[1] = 0.15 * vy           # L hip roll (lateral)
-        d[5] = -0.15 * vy          # R hip roll
-        d[3] = -0.25 * wz          # L ankle pivot
-        d[7] = 0.25 * wz           # R ankle pivot
+        d[7] = -0.15 * vy          # R hip roll
+        d[4] = -0.25 * wz         # L ankle pivot
+        d[10] = 0.25 * wz          # R ankle pivot
         return d
 
     def step(self, action):
@@ -303,11 +306,19 @@ class G1FighterEnv(gym.Env):
             # r1: frozen balance residual + arm residual
             bal_act = self.balance.predict(self._bal_obs(0), deterministic=True)[0] if self.balance else np.zeros(29)
             target = bal_act * 0.40 + self.native   # self.native == HOME
-            target[22:36] += self._residuals[0]   # ARM joints (22:36), NOT 15:29
+            if self.demo:
+                # For a watchable demo, let the SCRIPTED guard/punch
+                # own the arm joints fully (the smoke balance policy
+                # flails its arms and fights the guard). Legs/waist
+                # still come from balance so they keep standing.
+                target[15:29] = self.native[15:29] + self._residuals[0]
+            else:
+                target[15:29] += self._residuals[0]   # arm residual -> qpos[22:36]
             if self.demo:
                 # balance leg target overpowers small walk deltas;
-                # blend walk IN (60%) so footwork actually shows.
-                target[7:15] = target[7:15] * 0.4 + (self.native[7:15] + leg1) * 0.6
+                # blend walk IN (60%) on the LEG slice target[0:12]
+                # (qpos[7:19] = both legs) so footwork shows.
+                target[0:12] = target[0:12] * 0.4 + (self.native[0:12] + leg1) * 0.6
             kp = getattr(self, "rng_kp", KP)
             kd = getattr(self, "rng_kd", KD)
             tau1 = kp * (target - self.data.qpos[7:36]) - kd * self.data.qvel[6:35]
@@ -316,9 +327,12 @@ class G1FighterEnv(gym.Env):
             if self.opponent:
                 bal_act2 = self.balance.predict(self._bal_obs(1), deterministic=True)[0] if self.balance else np.zeros(29)
                 t2 = bal_act2 * 0.40 + self.native
-                t2[15:29] += self._residuals[1]
                 if self.demo:
-                    t2[7:15] += leg2
+                    t2[15:29] = self.native[15:29] + self._residuals[1]
+                else:
+                    t2[15:29] += self._residuals[1]
+                if self.demo:
+                    t2[0:12] = t2[0:12] * 0.4 + (self.native[0:12] + leg2) * 0.6
                 tau2 = kp * (t2 - self.data.qpos[43:72]) - kd * self.data.qvel[41:70]
                 self._apply_control(tau2, slice(29, 58))
             else:
