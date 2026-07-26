@@ -31,7 +31,8 @@ FRAME_SKIP = 4
 N_SKILL = 14
 N_CMD = 3
 ACT_DIM = N_SKILL + N_CMD
-OBS_DIM = 65
+OBS_DIM = 85  # quat4 + angvel3 + jrel29 + jvel29 + hp_self1 +
+              # hp_opp1 + rel3 + pelvis_z1 + residuals14 (SEE _get_obs)
 MAX_HP = 100.0
 RESIDUAL_SCALE = 0.15
 NATIVE_ROOT_X = [-0.6, 0.3]
@@ -213,14 +214,14 @@ class G1FighterEnv(gym.Env):
                 self._residuals[agent] += 0.25 * (raw - self._residuals[agent])
             # r1: frozen balance residual + arm residual
             bal_act = self.balance.predict(self._bal_obs(0), deterministic=True)[0] if self.balance else np.zeros(29)
-            target = bal_act * 0.10 + HOME
+            target = bal_act * 0.40 + HOME   # MUST match SCALE_BAL in g1_balance_env (0.40), else substrate starved
             target[15:29] += self._residuals[0]
             tau1 = KP * (target - self.data.qpos[7:36]) - KD * self.data.qvel[6:35]
             self.data.ctrl[:29] = np.clip(tau1, self.lo[:29], self.hi[:29])
             # r2: opponent or stand (no arm action)
             if self.opponent:
                 bal_act2 = self.balance.predict(self._bal_obs(1), deterministic=True)[0] if self.balance else np.zeros(29)
-                t2 = bal_act2 * 0.10 + HOME
+                t2 = bal_act2 * 0.40 + HOME
                 t2[15:29] += self._residuals[1]
                 tau2 = KP * (t2 - self.data.qpos[14:43]) - KD * self.data.qvel[13:42]
                 self.data.ctrl[29:58] = np.clip(tau2, self.lo[29:], self.hi[29:])
