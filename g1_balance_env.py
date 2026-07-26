@@ -33,7 +33,8 @@ N_ACT = 29
 N_OBS = 4 + 3 + 29 + 29
 SCALE_BAL = 0.40          # rad residual scale (policy needs real authority
                              # to actively balance; 0.10 was too weak)
-STAND_Z = 0.793
+STAND_Z = 0.76   # root/pelvis height with HOME joints -> feet ON floor
+                 # (0.793 left feet floating 4.4cm -> drop impact -> sag)
 FALL_Z = 0.40
 NATIVE_ROOT_X = [-0.6, 0.3]
 

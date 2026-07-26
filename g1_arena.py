@@ -279,4 +279,21 @@ def build_arena(ring="ropes", half=2.4):
                 model.geom_contype[i] = 0
                 model.geom_conaffinity[i] = 0
 
+    # FIRM CONTACTS -- a ~40kg humanoid on soft MuJoCo contacts (solref
+    # timeconst 0.02) slowly SINKS, which reads as "PD can't hold the G1"
+    # but is actually solver compliance. Stiffen floor + foot geoms so the
+    # feet plant firmly (normal spring timeconst 0.008, full damping) and
+    # raise impedance ratio so normal/friction are balanced. Also condim=4
+    # (pyramidal friction) for foot grip.
+    model.opt.impratio = 20.0
+    for i in range(model.ngeom):
+        bname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY,
+                                   model.geom_bodyid[i]) or ""
+        is_floor = model.geom_type[i] == mujoco.mjtGeom.mjGEOM_PLANE
+        is_foot = bname in FOOT_BODIES
+        if is_floor or is_foot:
+            model.geom_solref[i] = [0.008, 1.0]
+            model.geom_solimp[i] = [0.9, 0.95, 0.002, 0.5, 2.0]
+            model.geom_condim[i] = 4
+
     return model
