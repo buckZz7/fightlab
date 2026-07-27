@@ -20,8 +20,8 @@ def page(d, bout_map, title_video="bouts/title_bout.mp4"):
 
     rows = ""
     for i, s in enumerate(standings, 1):
-        medal = {1: "&#129351;", 2: "&#129352;", 3: "&#129353;"}.get(i, f"{i}")
-        crown = " &#128081;" if s["name"] == king else ""
+        medal = {1: "1", 2: "2", 3: "3"}.get(i, f"{i}")
+        crown = "" if s["name"] == king else ""
         rows += f"""
         <tr class="{'king-row' if s['name']==king else ''}">
           <td class="pos">{medal}</td>
@@ -175,14 +175,14 @@ def page(d, bout_map, title_video="bouts/title_bout.mp4"):
 <body>
   <div class="nav">
     <a href="index.html">Fight<span class="red">Lab</span></a>
-    <a href="index.html" class="back">← Back</a>
+    <a href="index.html" class="back">Back</a>
   </div>
   <h1>King of the <span class="red">Hill</span></h1>
   <div class="sub">Autonomous humanoid combat league &middot; MuJoCo + RL
    &middot; substrate: {html.escape(str(sub))}</div>
 
   <div class="king-banner">
-    <div class="lbl">&#128081; Current King</div>
+    <div class="lbl">Current King</div>
     <div class="who">{html.escape(str(king))}</div>
   </div>
 
