@@ -38,10 +38,8 @@ from combat_rules import CombatJudge
 
 
 class ShadowBoxer:
-    """Scripted boxer: drives arm joints (14) with jab/cross/guard
-    trajectories + footwork (3) to close distance. Both bots stand
-    via the frozen balance substrate; this actor only modulates the
-    arm residuals + walk cmd so it LOOKS like a fight.
+    """Scripted combatant: punches, kicks, dodges, guards, footwork.
+    Drives arm joints (14) + walk cmd (3) to create a realistic opponent.
 
     action (17) = [arm residual 14 | walk cmd 3]
       arm residual 14 -> HOME[15:29] (shoulders/elbows/wrists)
@@ -51,55 +49,44 @@ class ShadowBoxer:
         self.env = env
         self.style = style
         self.profile = profile
-        # which side leads: red leads with RIGHT (cross), blue with LEFT (jab)
-        self.lead = 0 if style == "blue" else 1  # 0=joint-block L, 1=R
+        self.lead = 0 if style == "blue" else 1
         self.t = 0.0
-        self.phase = 0.0 if style == "red" else math.pi  # desync the two
-        # profile tuning: punch cadence (rate), aggressiveness (walk), guard
-        if profile == "jabbler":      # fast jabs, closes distance hard
+        self.phase = 0.0 if style == "red" else math.pi
+        # profile tuning
+        if profile == "jabbler":       # fast jabs, aggressive, no defense
             self.cadence = 3.2; self.walk_fwd = 0.6; self.punch_amp = 0.9
-        elif profile == "defender":   # guard-heavy, low aggression, counter
+            self.dodge_freq = 0.3; self.guard_freq = 0.2; self.kick_freq = 0.1
+        elif profile == "defender":   # guard-heavy, counter-puncher, evasive
             self.cadence = 1.6; self.walk_fwd = 0.15; self.punch_amp = 0.6
-        else:                          # balanced
+            self.dodge_freq = 0.8; self.guard_freq = 0.7; self.kick_freq = 0.05
+        elif profile == "balanced":   # all-round
             self.cadence = 2.4; self.walk_fwd = 0.4; self.punch_amp = 0.8
+            self.dodge_freq = 0.5; self.guard_freq = 0.4; self.kick_freq = 0.15
+        else:  # "pd" or default = passive
+            self.cadence = 1.0; self.walk_fwd = 0.0; self.punch_amp = 0.3
+            self.dodge_freq = 0.1; self.guard_freq = 0.1; self.kick_freq = 0.0
 
     def predict(self, obs, deterministic=True):
         self.t += 1
         dt = self.env.model.opt.timestep * self.env.frame_skip
-        # desync the two bots by PI so it reads as an EXCHANGE
-        # (red punches while blue guards, then swap), not mirrored sync.
         self.phase += dt * self.cadence
         p = self.phase if self.style == "red" else self.phase + math.pi
 
         arm = np.zeros(14)
-        arm = np.zeros(14)
-        # Arm joints are qpos 22:36 (NOT 15:29). Layout
-        # (arm action idx -> joint):
-        #   0 L_sh_p  1 L_sh_r  2 L_sh_y  3 L_elb
-        #   4 L_wr_r  5 L_wr_p  6 L_wr_y
-        #   7 R_sh_p  8 R_sh_r  9 R_sh_y 10 R_elb
-        #  11 R_wr_r 12 R_wr_p 13 R_wr_y
-        # MuJoCo G1: shoulder_pitch NEGATIVE drives the arm
-        # FORWARD+toward opponent (FK-verified: sh=-1.3 -> wrist
-        # 0.33m ahead of pelvis, z raised to 0.98). ELBOW
-        # POSITIVE = bent; straight punch ~0.1, guard ~1.3.
-        # GUARD: shoulder moderately forward/up, elbow bent (hand
-        # comes up near chest, reads as a clear guard).
-        arm[0] = -0.7;  arm[3] = 1.3      # L guard (fwd + bent)
+        # GUARD position: hands up, elbows bent (default stance)
+        arm[0] = -0.7;  arm[3] = 1.3      # L guard
         arm[7] = -0.7;  arm[10] = 1.3     # R guard
 
-        # PUNCH: lead arm extends forward (shoulder -1.0 max, elbow
-        # straightens to ~0.1). Cap at -1.0 so the arm drives FORWARD
-        # at the opponent, not up toward the ceiling at peak.
+        # PUNCH: lead arm extends on the beat
         atk = max(0.0, math.sin(p)) ** 2
         amp = 0.3 * self.punch_amp
-        if self.lead == 1:  # red throws RIGHT cross
-            arm[7] = -0.7 - amp * atk         # shoulder drives forward (cap -1.0)
-            arm[10] = 1.3 - 1.2 * atk         # elbow straightens
-        else:               # blue throws LEFT jab
+        if self.lead == 1:
+            arm[7] = -0.7 - amp * atk
+            arm[10] = 1.3 - 1.2 * atk
+        else:
             arm[0] = -0.7 - amp * atk
             arm[3] = 1.3 - 1.2 * atk
-        # COUNTER from rear arm on off-beat.
+        # COUNTER from rear arm on off-beat
         rear = max(0.0, math.sin(p + math.pi)) ** 2
         if self.lead == 1:
             arm[0] = -0.7 - amp * rear
@@ -108,12 +95,27 @@ class ShadowBoxer:
             arm[7] = -0.7 - amp * rear
             arm[10] = 1.3 - 1.1 * rear
 
-        # Footwork: shuffle forward toward center, weave a little.
-        # walk_fwd scales aggression (jabbler advances hard, defender
-        # stays planted and counters).
-        walk = np.array([self.walk_fwd + 0.2 * math.sin(p * 0.5),   # vx
-                         0.15 * math.sin(p * 0.9),                     # vy
-                         0.4 * math.sin(p * 0.4)])                    # wz
+        # KICK: occasional leg strike (use walk cmd to simulate)
+        # Kicks are signaled by a sharp forward lunge
+        kick = 0.0
+        if self.kick_freq > 0:
+            kick = max(0.0, math.sin(p * 0.5)) ** 2 * self.kick_freq
+
+        # DODGE: lateral movement to evade (weaves side to side)
+        dodge = math.sin(p * self.dodge_freq * 2.0) * 0.5
+
+        # GUARD recovery: when not punching, hands snap back to guard
+        guard_pulse = max(0.0, math.sin(p + math.pi/2)) * self.guard_freq
+        if atk < 0.3:  # not punching hard -> guard up
+            arm[0] = -0.7 - 0.2 * guard_pulse
+            arm[7] = -0.7 - 0.2 * guard_pulse
+
+        # Footwork: forward pressure + dodge weave + occasional kick lunge
+        walk = np.array([
+            self.walk_fwd + 0.2 * math.sin(p * 0.5) + 0.5 * kick,  # vx (forward + kick lunge)
+            dodge,                                                       # vy (dodge)
+            0.4 * math.sin(p * 0.4)                                      # wz (pivot)
+        ])
         act = np.concatenate([np.clip(arm, -1, 1), walk]).astype(np.float64)
         return act, None
 
