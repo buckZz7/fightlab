@@ -11,7 +11,7 @@ Usage:
 import os, sys, argparse, json, datetime, html
 
 
-def page(d, bout_map):
+def page(d, bout_map, title_video="bouts/title_bout.mp4"):
     king = d.get("king") or "TBD"
     standings = d.get("standings", [])
     results = d.get("results", [])
@@ -133,7 +133,7 @@ def page(d, bout_map):
       <span class="blue">Challenger</span>
     </div>
     <video controls muted playsinline loop>
-      <source src="bouts/title_bout.mp4" type="video/mp4">
+      <source src="{title_video}" type="video/mp4">
     </video>
   </div>
 
@@ -156,7 +156,18 @@ def main():
     for r in d.get("results", []):
         if r.get("mp4"):
             bout_map[(r["red"], r["blue"])] = r["mp4"]
-    html_txt = page(d, bout_map)
+    # Find the latest title bout video
+    bouts_dir = os.path.join(os.path.dirname(a.out), "bouts")
+    title_video = "bouts/title_bout.mp4"  # default
+    if os.path.exists(bouts_dir):
+        title_files = sorted([f for f in os.listdir(bouts_dir)
+                              if f.startswith("title_cycle") and f.endswith(".mp4")])
+        if title_files:
+            title_video = f"bouts/{title_files[-1]}"  # latest cycle
+        elif os.path.exists(os.path.join(bouts_dir, "title_bout.mp4")):
+            title_video = "bouts/title_bout.mp4"
+
+    html_txt = page(d, bout_map, title_video)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w") as f:
         f.write(html_txt)
