@@ -169,6 +169,10 @@ def main():
         "seeds_won_on": sorted(seeds_won),
         # Gate: ≥1 win + dealt damage + won on ≥2 seeds
         "pass": wins >= 1 and total_dmg_dealt >= MIN_DAMAGE_TO_PASS and len(seeds_won) >= 2,
+        "draws": draws,
+        "merge_decision": "MERGE" if wins >= 1 and total_dmg_dealt >= MIN_DAMAGE_TO_PASS and len(seeds_won) >= 2 else
+                          "DRAW" if wins == losses and draws > 0 else
+                          "REJECT",
         "bouts": results,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
