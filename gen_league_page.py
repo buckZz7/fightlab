@@ -148,7 +148,7 @@ def page(d, bout_map, title_video="bouts/title_bout.mp4"):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--standings", default="docs/league_test.json")
-    ap.add_argument("--out", default="docs/index.html")
+    ap.add_argument("--out", default="docs/league.html")
     a = ap.parse_args()
     d = json.load(open(a.standings))
     # map (red,blue) -> mp4 path if rendered

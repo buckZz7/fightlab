@@ -1,121 +1,324 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FightLab &mdash; King of the Hill</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FightLab — Autonomous Humanoid Combat</title>
 <style>
-  :root { --bg:#0a0c10; --card:#12151c; --line:#232936;
-          --txt:#e6e9ef; --mut:#8b93a3; --acc:#e8443f; --acc2:#2f6fff;
-          --gold:#f4c542; }
-  * { box-sizing:border-box; margin:0; padding:0 }
-  body { background:var(--bg); color:var(--txt);
-         font:15px/1.6 system-ui,Segoe UI,Roboto,Helvetica,Arial;
-         max-width:920px; margin:0 auto; padding:28px 18px 60px }
-  h1 { font-size:26px; letter-spacing:.5px }
-  .sub { color:var(--mut); margin-top:4px; font-size:13px }
-  .king-banner { margin:22px 0; padding:20px 22px; border-radius:14px;
-    background:linear-gradient(135deg,#1a1408,#120e05);
-    border:1px solid #4a3a12; }
-  .king-banner .lbl { color:var(--gold); font-size:12px;
-    letter-spacing:2px; text-transform:uppercase }
-  .king-banner .who { font-size:24px; font-weight:700; margin-top:4px }
-  .card { background:var(--card); border:1px solid var(--line);
-          border-radius:14px; padding:18px 20px; margin-top:18px }
-  h2 { font-size:17px; margin-bottom:12px; color:var(--txt) }
-  table { width:100%; border-collapse:collapse; font-variant-numeric:
-          tabular-nums }
-  th, td { text-align:left; padding:9px 10px; border-bottom:
-          1px solid var(--line) }
-  th { color:var(--mut); font-size:12px; text-transform:uppercase;
-       letter-spacing:.5px; font-weight:600 }
-  td.elo { font-weight:700; color:var(--gold) }
-  td.pos { width:36px }
-  .king-row td { background:#1a1610 }
-  .bouts { display:grid; grid-template-columns:1fr; gap:16px }
-  .bout { background:var(--card); border:1px solid var(--line);
-          border-radius:14px; overflow:hidden }
-  .bout-head { padding:12px 16px; display:flex; gap:10px;
-    align-items:center; border-bottom:1px solid var(--line);
-    font-weight:600 }
-  .bout-head .red { color:#ff7b76 } .bout-head .blue { color:#7aa8ff }
-  .bout-head .vs { color:var(--mut); font-weight:400; font-size:12px }
-  .bout video { width:100%; display:block; background:#000; aspect-ratio:16/9 }
-  .bout-meta { padding:10px 16px; color:var(--mut); font-size:13px }
-  footer { margin-top:26px; color:var(--mut); font-size:12px;
-          text-align:center }
-  a { color:var(--acc2) }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #08080c;
+    --bg2: #0e0e14;
+    --card: #13131a;
+    --line: #1e1e28;
+    --mut: #5a5a6e;
+    --gold: #d4af37;
+    --red: #e74c3c;
+    --blue: #3498db;
+    --txt: #e8e8ec;
+    --accent: #7c3aed;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--txt);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  .grid-bg {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(124, 58, 237, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124, 58, 237, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .glow {
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(124, 58, 237, 0.15), transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  .hero {
+    min-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px 0;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    font-size: 13px;
+    color: var(--mut);
+    margin-bottom: 24px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .hero-badge .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .hero h1 {
+    font-size: clamp(48px, 10vw, 88px);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    margin-bottom: 16px;
+    background: linear-gradient(180deg, #fff 0%, #888 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero h1 .accent {
+    background: linear-gradient(135deg, var(--red), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero p {
+    font-size: clamp(16px, 3vw, 20px);
+    color: var(--mut);
+    max-width: 560px;
+    margin-bottom: 40px;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #9333ea);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 30px rgba(124, 58, 237, 0.5);
+  }
+
+  .btn-secondary {
+    background: var(--card);
+    color: var(--txt);
+    border-color: var(--line);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    margin-top: 64px;
+    flex-wrap: wrap;
+  }
+
+  .stat { text-align: center; }
+  .stat .num { font-size: 32px; font-weight: 800; color: var(--gold); font-family: 'JetBrains Mono', monospace; }
+  .stat .lbl { font-size: 12px; color: var(--mut); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
+
+  .section { padding: 80px 0; border-top: 1px solid var(--line); }
+  .section h2 { font-size: 32px; font-weight: 800; margin-bottom: 32px; letter-spacing: -0.02em; }
+  .section h2 .num { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 400; margin-right: 12px; }
+
+  .pipeline { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .pipeline-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+  .pipeline-card:hover { border-color: var(--accent); }
+  .pipeline-card .step { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); margin-bottom: 8px; }
+  .pipeline-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .pipeline-card p { color: var(--mut); font-size: 14px; }
+  .pipeline-card code { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gold); background: var(--bg); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); }
+
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .rule { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .rule .icon { font-size: 24px; margin-bottom: 8px; }
+  .rule h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .rule p { font-size: 13px; color: var(--mut); }
+  .rule a { color: var(--accent); text-decoration: none; }
+
+  .enter-steps { counter-reset: step; }
+  .enter-step { display: flex; gap: 16px; align-items: start; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .enter-step:last-child { border-bottom: none; }
+  .enter-step::before { counter-increment: step; content: counter(step); flex-shrink: 0; width: 32px; height: 32px; background: var(--accent); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; font-family: 'JetBrains Mono', monospace; }
+  .enter-step .content h3 { font-size: 15px; font-weight: 700; }
+  .enter-step .content p { font-size: 13px; color: var(--mut); margin-top: 2px; }
+  .enter-step .content code { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gold); background: var(--bg); padding: 1px 6px; border-radius: 4px; }
+
+  footer { padding: 40px 0; border-top: 1px solid var(--line); text-align: center; color: var(--mut); font-size: 13px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 600px) {
+    .stats { gap: 24px; }
+    .hero-cta { flex-direction: column; align-items: center; }
+    .btn { width: 100%; justify-content: center; }
+  }
 </style>
 </head>
 <body>
-  <h1>FightLab &#129354; King of the Hill</h1>
-  <div class="sub">Autonomous humanoid combat league &middot; MuJoCo + RL
-   &middot; substrate: PD</div>
+  <div class="grid-bg"></div>
+  <div class="glow"></div>
 
-  <div class="king-banner">
-    <div class="lbl">&#128081; Current King</div>
-    <div class="who">fighter_v2.zip</div>
-  </div>
+  <div class="container">
+    <div class="hero">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        <span>LIVE · Training in progress</span>
+      </div>
 
-  <div class="card">
-    <h2>Standings</h2>
-    <table>
-      <thead><tr><th>#</th><th>Fighter</th><th>ELO</th>
-      <th>W</th><th>L</th><th>D</th></tr></thead>
-      <tbody>
-        <tr class="king-row">
-          <td class="pos">&#129351;</td>
-          <td class="name">fighter_v2.zip &#128081;</td>
-          <td class="elo">1646</td>
-          <td>12</td><td>0</td><td>0</td>
-        </tr>
-        <tr class="">
-          <td class="pos">&#129352;</td>
-          <td class="name">scripted:jabbler</td>
-          <td class="elo">1549</td>
-          <td>8</td><td>4</td><td>0</td>
-        </tr>
-        <tr class="">
-          <td class="pos">&#129353;</td>
-          <td class="name">scripted:defender</td>
-          <td class="elo">1479</td>
-          <td>5</td><td>7</td><td>0</td>
-        </tr>
-        <tr class="">
-          <td class="pos">4</td>
-          <td class="name">scripted:balanced</td>
-          <td class="elo">1433</td>
-          <td>3</td><td>9</td><td>0</td>
-        </tr>
-        <tr class="">
-          <td class="pos">5</td>
-          <td class="name">scripted:pd</td>
-          <td class="elo">1393</td>
-          <td>2</td><td>10</td><td>0</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+      <h1>Fight<span class="accent">Lab</span></h1>
+      <p>Autonomous humanoid combat league. Unitree G1 robots learn to fight through reinforcement learning — punches, kicks, blocks, and strategy. King of the hill, always evolving.</p>
 
-  <h2 style="margin-top:26px">Bouts</h2>
-  <div class="bouts"><div class="sub">No bout videos rendered yet.</div>
-  </div>
+      <div class="hero-cta">
+        <a href="league.html" class="btn btn-primary">🥊 View League Standings</a>
+        <a href="https://github.com/buckZz7/fightlab" class="btn btn-secondary">⌨ GitHub</a>
+      </div>
 
-  <h2 style="margin-top:26px">Title Bout</h2>
-  <div class="bout">
-    <div class="bout-head">
-      <span class="red">King: fighter_v2.zip</span>
-      <span class="vs">vs</span>
-      <span class="blue">Challenger</span>
+      <div class="stats">
+        <div class="stat"><div class="num">29</div><div class="lbl">DoF G1 Robot</div></div>
+        <div class="stat"><div class="num">27</div><div class="lbl">Mocap Motions</div></div>
+        <div class="stat"><div class="num">720p</div><div class="lbl">EGL Render</div></div>
+        <div class="stat"><div class="num">2x</div><div class="lbl">Head Damage</div></div>
+      </div>
     </div>
-    <video controls muted playsinline loop>
-      <source src="bouts/title_bout.mp4" type="video/mp4">
-    </video>
-  </div>
 
-  <footer>
-    Generated 2026-07-27T02:09:03.379101Z UTC &middot; FightLab &middot;
-    <a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a>
-  </footer>
+    <div class="section">
+      <h2><span class="num">01</span>How It Works</h2>
+      <div class="pipeline">
+        <div class="pipeline-card">
+          <div class="step">STAGE 1 — MOTION TRACKER</div>
+          <h3>Learn to move</h3>
+          <p>Imitates human combat mocap (punches, kicks, blocks) retargeted to the G1's 29-DoF body. Learns balance, weight transfer, and natural movement.</p>
+        </div>
+        <div class="pipeline-card">
+          <div class="step">STAGE 2 — COMBAT FINE-TUNE</div>
+          <h3>Learn to fight</h3>
+          <p>RL with combat rewards on top of the tracker. Learns to hit (damage), face the opponent, close distance, and stay standing. Full combat: punches, kicks, spins.</p>
+        </div>
+        <div class="pipeline-card">
+          <div class="step">STAGE 3 — LEAGUE</div>
+          <h3>Compete for the crown</h3>
+          <p>Round-robin bouts with ELO scoring. Top challenger gets a title shot against the current king. 10-point must per round, KO/fall/decision.</p>
+        </div>
+        <div class="pipeline-card">
+          <div class="step">EVOLUTION</div>
+          <h3>Always evolving</h3>
+          <p>Each new king gets archived. The next challenger trains against all past kings + scripted opponents. The league never stops improving.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="num">02</span>Combat Rules</h2>
+      <div class="rules">
+        <div class="rule"><div class="icon">🥊</div><h3>Full Combat</h3><p>Punches, kicks, knees, elbows — all legal</p></div>
+        <div class="rule"><div class="icon">💀</div><h3>Head = 2x Damage</h3><p>Head hits devastating — incentivizes blocking</p></div>
+        <div class="rule"><div class="icon">🦵</div><h3>Kicks = 1.5x</h3><p>More mass, more velocity, more damage</p></div>
+        <div class="rule"><div class="icon">🤝</div><h3>Draws Exist</h3><p>Damage gap < 2 HP = draw round. No coin flips.</p></div>
+        <div class="rule"><div class="icon">🏆</div><h3>King Stays on Draw</h3><p>You must BEAT the king to take the crown</p></div>
+        <div class="rule"><div class="icon">📊</div><h3>10-Point Must</h3><p>3 rounds × 20s. KO, fall, or decision.</p></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="num">03</span>How to Enter</h2>
+      <div class="enter-steps">
+        <div class="enter-step"><div class="content"><h3>Fork the repo</h3><p>Clone <code>github.com/buckZz7/fightlab</code></p></div></div>
+        <div class="enter-step"><div class="content"><h3>Train your fighter</h3><p><code>train_motion_tracker.py</code> → <code>train_combat.py</code></p></div></div>
+        <div class="enter-step"><div class="content"><h3>Test locally</h3><p><code>deterministic_eval.py --fighter models/my_fighter.zip</code></p></div></div>
+        <div class="enter-step"><div class="content"><h3>Submit a PR</h3><p>Add your <code>.zip</code> to <code>models/</code> and open a pull request</p></div></div>
+        <div class="enter-step"><div class="content"><h3>CI runs trustless eval</h3><p>Deterministic, multi-seed, hashed, auditable — runs in GitHub Actions</p></div></div>
+        <div class="enter-step"><div class="content"><h3>Pass the gate → title bout</h3><p>Win ≥1 bout, deal ≥1 damage, win on ≥2 seeds. Beat the king to take the crown.</p></div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="num">04</span>Trustless Evaluation</h2>
+      <div class="rules">
+        <div class="rule"><div class="icon">🔒</div><h3>Deterministic</h3><p>Fixed seeds (42, 123, 777). Same result every run.</p></div>
+        <div class="rule"><div class="icon">🔑</div><h3>Model Hashed</h3><p>SHA256 verified. Can't swap models mid-eval.</p></div>
+        <div class="rule"><div class="icon">📋</div><h3>Bout Logs</h3><p>Per-step HP + damage JSON. Fully auditable.</p></div>
+        <div class="rule"><div class="icon">🤖</div><h3>GitHub Actions</h3><p>Runs in CI, not our infrastructure. Anyone can reproduce.</p></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="num">05</span>Tech Stack</h2>
+      <div class="rules">
+        <div class="rule"><div class="icon">🧮</div><h3>MuJoCo + EGL</h3><p>GPU-accelerated physics + rendering at 225 fps</p></div>
+        <div class="rule"><div class="icon">🧠</div><h3>PPO + SB3</h3><p>16 parallel envs, 1593 fps training</p></div>
+        <div class="rule"><div class="icon">🎥</div><h3>Mocap Data</h3><p><a href="https://huggingface.co/datasets/exptech/g1-moves">exptech/g1-moves</a> — 27 karate motions</p></div>
+        <div class="rule"><div class="icon">🤖</div><h3>AMP</h3><p>Adversarial motion prior for natural movement</p></div>
+      </div>
+    </div>
+
+    <div class="section" style="text-align: center; padding: 100px 0;">
+      <h2 style="margin-bottom: 24px;">Ready to fight?</h2>
+      <p style="color: var(--mut); margin-bottom: 32px; max-width: 480px; margin-left: auto; margin-right: auto;">
+        Train a fighter, submit a PR, take the crown. The league is always evolving — will your fighter be the next king?
+      </p>
+      <div class="hero-cta" style="justify-content: center;">
+        <a href="league.html" class="btn btn-primary">🥊 View Standings</a>
+        <a href="https://github.com/buckZz7/fightlab" class="btn btn-secondary">⌨ Fork on GitHub</a>
+      </div>
+    </div>
+
+    <footer>
+      FightLab · Autonomous Humanoid Combat League<br>
+      <a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a> ·
+      Built with MuJoCo + PPO + EGL
+    </footer>
+  </div>
 </body>
 </html>
