@@ -1,0 +1,43 @@
+# FightLab CI — auto-runs league gate on PR submissions
+# Triggers when a PR adds a models/*.zip fighter model
+name: FightLab League Gate
+
+on:
+  pull_request:
+    paths:
+      - 'models/*.zip'
+
+jobs:
+  league-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install mujoco stable-baselines3 gymnasium numpy imageio Pillow --no-deps
+          pip install shimmy cloudpickle
+
+      - name: Find submitted fighter
+        id: find
+        run: |
+          # Find the .zip added in this PR
+          FIGHTER=$(git diff --name-only origin/main...HEAD -- 'models/*.zip' | head -1)
+          echo "fighter=$FIGHTER" >> $GITHUB_OUTPUT
+          echo "Found fighter: $FIGHTER"
+
+      - name: Run league gate
+        if: steps.find.outputs.fighter != ''
+        run: |
+          python3 ci_gate.py --fighter "${{ steps.find.outputs.fighter }}" --threshold 1400
+
+      - name: Gate result
+        if: always()
+        run: |
+          echo "## FightLab League Gate" >> $GITHUB_STEP_SUMMARY
+          echo "Fighter: ${{ steps.find.outputs.fighter }}" >> $GITHUB_STEP_SUMMARY
+          echo "Result: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

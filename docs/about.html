@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FightLab — Autonomous Humanoid Combat League</title>
+<style>
+  :root { --bg:#0a0a0c; --card:#15151a; --line:#2a2a30; --mut:#6a6a72;
+          --gold:#d4af37; --red:#e74c3c; --blue:#3498db; --txt:#e8e8ec; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--txt); font-family:system-ui,
+        -apple-system,sans-serif; line-height:1.6; padding:20px; max-width:900px; margin:0 auto; }
+  h1 { font-size:28px; margin:20px 0 5px; }
+  h2 { font-size:20px; margin:24px 0 10px; color:var(--gold); }
+  p { margin:8px 0; color:var(--mut); }
+  strong { color:var(--txt); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin:12px 0; }
+  .stat { display:inline-block; margin-right:20px; }
+  .stat .num { font-size:24px; font-weight:bold; color:var(--gold); }
+  .stat .lbl { font-size:12px; color:var(--mut); text-transform:uppercase; }
+  a { color:var(--blue); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  code { background:var(--bg); padding:2px 6px; border-radius:4px; font-size:13px; border:1px solid var(--line); }
+  ul { margin:8px 0 8px 20px; }
+  li { margin:4px 0; }
+</style>
+</head>
+<body>
+  <h1>FightLab 🥊</h1>
+  <p>Autonomous humanoid combat league — Unitree G1 robots fight via RL in MuJoCo</p>
+
+  <h2>What is FightLab?</h2>
+  <div class="card">
+    <p>FightLab is a king-of-the-hill league where <strong>Unitree G1 humanoid robots</strong>
+       learn to fight using reinforcement learning. Fighters are trained via a 3-stage
+       pipeline:</p>
+    <ul>
+      <li><strong>Stage 1 — Motion Tracker:</strong> Imitates human combat mocap (punches, kicks, blocks) retargeted to the G1's 29-DoF body</li>
+      <li><strong>Stage 2 — Combat Fine-Tune:</strong> RL with combat rewards (damage, facing, approach, survival) on top of the tracker</li>
+      <li><strong>Stage 3 — League:</strong> Round-robin bouts with ELO scoring. Top challenger fights the king for the crown</li>
+    </ul>
+  </div>
+
+  <h2>Current King</h2>
+  <div class="card">
+    <p>🏆 Check the <a href="index.html">live standings</a> for the current king, ELO rankings, and title bout video.</p>
+  </div>
+
+  <h2>How to Enter</h2>
+  <div class="card">
+    <ol>
+      <li><strong>Fork</strong> the <a href="https://github.com/buckZz7/fightlab">repo</a></li>
+      <li><strong>Train</strong> your fighter using the pipeline:
+        <br><code>python3 train_motion_tracker.py --steps 2000000 --out models/my_tracker</code>
+        <br><code>python3 train_combat.py --tracker models/my_tracker.zip --steps 1000000 --out models/my_fighter</code></li>
+      <li><strong>Test</strong> in the league:
+        <br><code>python3 league.py --entrants models/my_fighter.zip scripted:jabbler scripted:defender --pd</code></li>
+      <li><strong>Submit</strong> a PR with your <code>.zip</code> model. CI auto-runs the league gate (ELO ≥ 1400, ≥1 win)</li>
+      <li><strong>Title bout:</strong> if your fighter passes CI, it gets a title shot against the current king</li>
+    </ol>
+  </div>
+
+  <h2>Rules</h2>
+  <div class="card">
+    <ul>
+      <li><strong>Full combat:</strong> punches, kicks, knees, elbows all legal</li>
+      <li><strong>Scoring:</strong> 10-point must per round (3 rounds, 20s each)</li>
+      <li><strong>Damage:</strong> Head hits = 2x, body = 1x, kicks = 1.5x, leg kicks = 0.5x</li>
+      <li><strong>Win:</strong> KO (HP ≤ 0), knockdown (fall), or decision (points)</li>
+      <li><strong>Weapons:</strong> Wrists (punches) + ankles (kicks) = damage sources</li>
+    </ul>
+  </div>
+
+  <h2>Tech Stack</h2>
+  <div class="card">
+    <ul>
+      <li><strong>Physics:</strong> MuJoCo (GPU-accelerated via EGL rendering)</li>
+      <li><strong>Training:</strong> PPO via Stable Baselines3, 16 parallel envs</li>
+      <li><strong>Mocap:</strong> <a href="https://huggingface.co/datasets/exptech/g1-moves">exptech/g1-moves</a> dataset (retargeted to G1 29-DoF)</li>
+      <li><strong>Platform:</strong> Unitree G1 (29-DoF, bare-handed wrist-as-fist)</li>
+      <li><strong>Rendering:</strong> EGL 720p, broadcast tracking camera</li>
+    </ul>
+  </div>
+
+  <h2>Links</h2>
+  <div class="card">
+    <ul>
+      <li><a href="index.html">📊 Live Standings</a></li>
+      <li><a href="https://github.com/buckZz7/fightlab">🐙 GitHub Repo</a></li>
+      <li><a href="https://huggingface.co/datasets/exptech/g1-moves">📋 Mocap Dataset</a></li>
+    </ul>
+  </div>
+
+  <footer style="margin-top:30px; padding-top:15px; border-top:1px solid var(--line);
+                font-size:12px; color:var(--mut);">
+    FightLab · Autonomous Humanoid Combat League ·
+    <a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a>
+  </footer>
+</body>
+</html>
