@@ -174,6 +174,15 @@ class MotionTrackerEnv(gym.Env):
 
         reward = 0.25 * joint_reward + 0.15 * vel_reward + 0.2 * body_reward + 0.3 * upright_reward + 0.1 * foot_reward
 
+        # AMP style reward: how much this motion looks like real combat
+        # (optional — only if AMP discriminator is loaded)
+        if hasattr(self, "amp") and self.amp is not None:
+            cur_jp = self.data.qpos[self.qpos_off + 7:self.qpos_off + 36] - self.home
+            cur_jv = self.data.qvel[self.qvel_off + 6:self.qvel_off + 35]
+            amp_obs = np.concatenate([cur_jp, cur_jv])
+            amp_reward = self.amp.compute_reward(amp_obs)
+            reward += 0.1 * amp_reward
+
         # Penalize falling
         terminated = pelvis_z < 0.3
         truncated = self.step_count >= self.max_steps
@@ -196,6 +205,7 @@ def main():
     ap.add_argument("--out", default="models/motion_tracker")
     ap.add_argument("--envs", type=int, default=8)
     ap.add_argument("--max-steps", type=int, default=500)
+    ap.add_argument("--amp", action="store_true", help="enable AMP style reward")
     a = ap.parse_args()
 
     motions = load_motions(a.data)
@@ -203,7 +213,31 @@ def main():
         print(f"No motions found in {a.data}")
         sys.exit(1)
 
-    env = SubprocVecEnv([make_env(motions, a.max_steps, i) for i in range(a.envs)])
+    # Initialize AMP discriminator if enabled
+    amp_disc = None
+    if a.amp:
+        from amp import AMPDiscriminator, collect_mocap_samples
+        amp_disc = AMPDiscriminator(input_dim=58)
+        real_samples = collect_mocap_samples(motions, n_samples=2000)
+        print(f"[tracker] AMP enabled with {len(real_samples)} real samples")
+        # Pre-train discriminator on real samples
+        import torch
+        opt = torch.optim.Adam(amp_disc.parameters(), lr=1e-3)
+        fake_initial = [np.random.randn(58) * 0.5 for _ in range(len(real_samples))]
+        for _ in range(100):
+            amp_disc.train_step(real_samples, fake_initial, opt)
+        print("[tracker] AMP discriminator pre-trained")
+
+    def _init_amp():
+        env = MotionTrackerEnv(motions, max_steps=a.max_steps)
+        env.amp = amp_disc
+        env.reset(seed=0)
+        return env
+
+    if a.amp:
+        env = SubprocVecEnv([_init_amp for _ in range(a.envs)])
+    else:
+        env = SubprocVecEnv([make_env(motions, a.max_steps, i) for i in range(a.envs)])
 
     model = PPO("MlpPolicy", env,
                 learning_rate=3e-4,
