@@ -58,10 +58,18 @@ class CombatEnv(G1FighterEnv):
 
         # Action space: same as G1FighterEnv (14 arm skills + 3 walk)
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(ACT_DIM,), dtype=np.float32)
-        obs_dim = 85  # match G1FighterEnv
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
+        # Match G1FighterEnv obs dim (85)
+        from g1_fighter_env import OBS_DIM
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(OBS_DIM,), dtype=np.float64)
 
         self._setup_ids()
+        self._base_mass = self.model.body_mass.copy()
+        self._base_friction = self.model.geom_friction.copy()
+        self.lo = self.model.actuator_ctrlrange[:, 0].copy()
+        self.hi = self.model.actuator_ctrlrange[:, 1].copy()
+        from g1_moves_reward import MoveCoach
+        motion_dir = os.path.join(os.path.dirname(os.environ.get("G1_SCENE_XML", "")), "motions") if os.environ.get("G1_SCENE_XML") else None
+        self.coach = MoveCoach(motion_dir)
         self.hp = [MAX_HP, MAX_HP]
         self._residuals = [np.zeros(N_SKILL), np.zeros(N_SKILL)]
         self._contact_states = {}
@@ -90,12 +98,17 @@ class CombatEnv(G1FighterEnv):
     def _tracker_obs(self, agent):
         """obs for the motion tracker (matches train_motion_tracker format).
         Tracker expects: [joint_pos - home, joint_vel, ref_pos - home, ref_vel]
-        But we don't have a reference motion here — use the tracker as a
-        balance controller with zero reference (just maintain current pose).
-        Actually the tracker needs its own obs format. Since we're using it
-        as a substrate (not tracking), we feed it the G1FighterEnv balance obs
-        and use its output as the base joint targets."""
-        return self._bal_obs(agent)
+        In combat we use zero reference (maintain current pose = balance mode)."""
+        off = 0 if agent == 0 else 36
+        qp = self.data.qpos[off:off + 36]
+        qv_off = (off - 1) if off > 0 else 0
+        qv = self.data.qvel[qv_off:qv_off + 35]
+        jrel = qp[7:36] - self.native  # (29,)
+        jvel = qv[6:35]                # (29,)
+        # Zero reference = "maintain current pose"
+        ref_pos = np.zeros(29)
+        ref_vel = np.zeros(29)
+        return np.concatenate([jrel, jvel, ref_pos, ref_vel]).astype(np.float32)
 
     def step(self, action):
         arm_action = np.clip(action[:N_SKILL], -1, 1)
