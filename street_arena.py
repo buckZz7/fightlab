@@ -138,7 +138,8 @@ def build_default_2bot():
                    "left_elbow_link", "right_elbow_link",
                    "left_wrist_yaw_link", "right_wrist_yaw_link",
                    "left_ankle_pitch_link", "left_ankle_roll_link",
-                   "right_ankle_pitch_link", "right_ankle_roll_link"]:
+                   "right_ankle_pitch_link", "right_ankle_roll_link",
+                   "left_knee_link", "right_knee_link"]:
             bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"{pfx}{nm}")
             if bid >= 0:
                 COMBAT_BODIES.add(bid)

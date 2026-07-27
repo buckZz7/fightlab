@@ -114,6 +114,8 @@ class G1FighterEnv(gym.Env):
         self.pelvis_id = []
         self.fist_geoms = []
         self.torso_bodies = []
+        self.leg_bodies = []
+        # Upper body targets (full damage)
         TORSO = ["torso_link", "head_link",
                  "left_shoulder_pitch_link", "right_shoulder_pitch_link",
                  "left_shoulder_roll_link", "right_shoulder_roll_link",
@@ -126,6 +128,8 @@ class G1FighterEnv(gym.Env):
                  "left_hip_pitch_link", "right_hip_pitch_link",
                  "left_hip_roll_link", "right_hip_roll_link",
                  "left_hip_yaw_link", "right_hip_yaw_link"]
+        # Leg targets (reduced damage — leg kicks count but aren't overpowered)
+        LEGS = ["left_knee_link", "right_knee_link"]
         for i, pfx in enumerate(["r1_", "r2_"]):
             self.pelvis_id.append(self.model.body(f"{pfx}pelvis").id)
             # Weapons = WRIST collision geoms (punches) + ANKLE collision geoms (kicks)
@@ -147,6 +151,12 @@ class G1FighterEnv(gym.Env):
                 if bid >= 0:
                     bodies.add(bid)
             self.torso_bodies.append(bodies)
+            legs = set()
+            for nm in LEGS:
+                bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, f"{pfx}{nm}")
+                if bid >= 0:
+                    legs.add(bid)
+            self.leg_bodies.append(legs)
 
     def _pelvis_z(self, a):
         return float(self.data.xpos[self.pelvis_id[a]][2])
@@ -249,22 +259,33 @@ class G1FighterEnv(gym.Env):
                 for is_fist, wgid in weapons:
                     if g1 == wgid or g2 == wgid:
                         other = b2 if g1 == wgid else b1
-                        if other in self.torso_bodies[opp]:
-                            rel_vel = self._weapon_rel_vel(agent, opp, wgid)
-                            # Kicks do more damage (more mass, more velocity)
-                            dmg_mult = 1.0 if is_fist else 1.5
-                            if rel_vel > 1.0:
-                                dmg = min(8.0, max(0.0, rel_vel * 4.0 * dmg_mult))
-                            elif rel_vel > 0.5:
-                                dmg = min(2.0, rel_vel * 1.0 * dmg_mult)
-                            else:
-                                dmg = 0.0
-                            if dmg > 0:
-                                self.hp[opp] = max(0.0, self.hp[opp] - dmg)
-                                self._dmg_dealt[agent] += dmg
-                                self._dmg_taken[opp] += dmg
-                                self._contact_states[(agent, opp)] = {"shove": dmg == 0, "dmg": dmg}
+                        # Check if hit target is upper body or legs
+                        is_leg_target = other in self.leg_bodies[opp]
+                        is_torso_target = other in self.torso_bodies[opp]
+                        if not (is_torso_target or is_leg_target):
                             break
+                        rel_vel = self._weapon_rel_vel(agent, opp, wgid)
+                        # Damage multipliers:
+                        # - Punch to upper body: 1.0x
+                        # - Kick to upper body: 1.5x (more mass + velocity)
+                        # - Kick to legs: 0.5x (leg kicks count but reduced)
+                        # - Punch to legs: 0.3x (rare, low damage)
+                        if is_leg_target:
+                            dmg_mult = 0.5 if not is_fist else 0.3
+                        else:
+                            dmg_mult = 1.0 if is_fist else 1.5
+                        if rel_vel > 1.0:
+                            dmg = min(8.0, max(0.0, rel_vel * 4.0 * dmg_mult))
+                        elif rel_vel > 0.5:
+                            dmg = min(2.0, rel_vel * 1.0 * dmg_mult)
+                        else:
+                            dmg = 0.0
+                        if dmg > 0:
+                            self.hp[opp] = max(0.0, self.hp[opp] - dmg)
+                            self._dmg_dealt[agent] += dmg
+                            self._dmg_taken[opp] += dmg
+                            self._contact_states[(agent, opp)] = {"shove": dmg == 0, "dmg": dmg}
+                        break
 
     def _weapon_rel_vel(self, agent, opp, wgid):
         fb = self.model.geom_bodyid[wgid]
