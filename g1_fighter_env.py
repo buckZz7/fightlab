@@ -118,18 +118,18 @@ class G1FighterEnv(gym.Env):
                   "right_shoulder_pitch_link", "left_elbow_link", "right_elbow_link"]
         for i, pfx in enumerate(["r1_", "r2_"]):
             self.pelvis_id.append(self.model.body(f"{pfx}pelvis").id)
-            # Fists = the WRIST's natural collision geoms (contype>0).
-            # RoboStriker uses the G1's wrist-end as the fist (no fake
-            # sphere, no finger bodies -- the wrist IS the hand).
+            # Weapons = WRIST collision geoms (punches) + ANKLE collision geoms (kicks)
+            # Full combat: fists and feet both count as striking weapons.
             fg = []
             for side in ("left", "right"):
-                wb = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY,
-                                        f"{pfx}{side}_wrist_yaw_link")
-                if wb >= 0:
-                    for j in range(self.model.body_geomnum[wb]):
-                        gid = self.model.body_geomadr[wb] + j
-                        if self.model.geom_contype[gid] > 0:
-                            fg.append(gid)
+                for body_name in ("wrist_yaw_link", "ankle_roll_link"):
+                    wb = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY,
+                                            f"{pfx}{side}_{body_name}")
+                    if wb >= 0:
+                        for j in range(self.model.body_geomnum[wb]):
+                            gid = self.model.body_geomadr[wb] + j
+                            if self.model.geom_contype[gid] > 0:
+                                fg.append(("wrist" in body_name, gid))  # (is_fist, geom_id)
             self.fist_geoms.append(fg)
             bodies = set()
             for nm in TORSO:
@@ -235,29 +235,29 @@ class G1FighterEnv(gym.Env):
             b1 = self.model.geom_bodyid[g1]
             b2 = self.model.geom_bodyid[g2]
             for agent, opp in [(0, 1), (1, 0)]:
-                fists = self.fist_geoms[agent]
-                if g1 in fists or g2 in fists:
-                    other = b2 if g1 in fists else b1
-                    if other in self.torso_bodies[opp]:
-                        rel_vel = self._fist_rel_vel(agent, opp)
-                        # RoboStriker gates hits on BOTH relative speed AND
-                        # contact force. We use rel_vel as the speed gate
-                        # (force via mj_contactForce is heavier; rel_vel is a
-                        # robust proxy for a real strike vs a shove).
-                        if rel_vel > 1.0:          # real punch (forceful)
-                            dmg = min(8.0, max(0.0, rel_vel * 4.0))
-                        elif rel_vel > 0.5:        # glancing
-                            dmg = min(2.0, rel_vel * 1.0)
-                        else:                      # shove (no reward)
-                            dmg = 0.0
-                        if dmg > 0:
-                            self.hp[opp] = max(0.0, self.hp[opp] - dmg)
-                            self._dmg_dealt[agent] += dmg
-                            self._dmg_taken[opp] += dmg
-                            self._contact_states[(agent, opp)] = {"shove": dmg == 0, "dmg": dmg}
+                weapons = self.fist_geoms[agent]
+                for is_fist, wgid in weapons:
+                    if g1 == wgid or g2 == wgid:
+                        other = b2 if g1 == wgid else b1
+                        if other in self.torso_bodies[opp]:
+                            rel_vel = self._weapon_rel_vel(agent, opp, wgid)
+                            # Kicks do more damage (more mass, more velocity)
+                            dmg_mult = 1.0 if is_fist else 1.5
+                            if rel_vel > 1.0:
+                                dmg = min(8.0, max(0.0, rel_vel * 4.0 * dmg_mult))
+                            elif rel_vel > 0.5:
+                                dmg = min(2.0, rel_vel * 1.0 * dmg_mult)
+                            else:
+                                dmg = 0.0
+                            if dmg > 0:
+                                self.hp[opp] = max(0.0, self.hp[opp] - dmg)
+                                self._dmg_dealt[agent] += dmg
+                                self._dmg_taken[opp] += dmg
+                                self._contact_states[(agent, opp)] = {"shove": dmg == 0, "dmg": dmg}
+                            break
 
-    def _fist_rel_vel(self, agent, opp):
-        fb = self.model.geom_bodyid[self.fist_geoms[agent][0]]
+    def _weapon_rel_vel(self, agent, opp, wgid):
+        fb = self.model.geom_bodyid[wgid]
         opp_pel = self.data.xpos[self.pelvis_id[opp]]
         fist_pos = self.data.xpos[fb]
         fist_vel = self.data.cvel[fb][:3]
@@ -266,6 +266,11 @@ class G1FighterEnv(gym.Env):
         rel = opp_pel - fist_pos
         rel_dir = rel / (np.linalg.norm(rel) + 1e-6)
         return float(np.dot(fist_vel, rel_dir))
+
+    def _fist_rel_vel(self, agent, opp):
+        """Legacy: uses first weapon geom."""
+        wgid = self.fist_geoms[agent][0][1] if isinstance(self.fist_geoms[agent][0], tuple) else self.fist_geoms[agent][0]
+        return self._weapon_rel_vel(agent, opp, wgid)
 
     def _foot_contact_count(self, agent=0):
         """Count a bot's foot geoms touching a non-self body (the floor)."""

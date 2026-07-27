@@ -80,30 +80,27 @@ class BoxingJudge:
         return self._rb_cache[agent]
 
     def _detect_foul(self, agent, opp):
-        """Detect illegal contact (non-fist / clinch / rear-head).
+        """Detect illegal contact (clinch/shove, NOT kicks or punches).
 
-        The env only records fist-torso contacts in _contact_states. Any
-        OTHER persistent contact between the two robots' bodies that is not
-        a legal fist strike counts as a foul (clinch/shove/limb collision).
-        We approximate: if a robot's HP dropped without a recorded legal hit,
-        OR sustained close contact with no legal strike, flag a foul.
+        Full combat: fists (wrists) and feet (ankles) are legal weapons.
+        Only penalize body-to-body contact that isn't a strike.
         """
-        # Simplified foul model: non-fist body contact detected via geoms.
-        # The env doesn't yet record these; we hook into contact geoms here.
         fouled = False
         for con in range(self.env.data.ncon):
             c = self.env.data.contact[con]
             g1, g2 = c.geom1, c.geom2
             b1 = self.env.model.geom_bodyid[g1]
             b2 = self.env.model.geom_bodyid[g2]
-            # contact between the two robots, neither geom is a fist
             if (b1 in self._robot_bodies(agent) and b2 in self._robot_bodies(opp)) or \
                (b2 in self._robot_bodies(agent) and b1 in self._robot_bodies(opp)):
-                f1 = g1 in self.env.fist_geoms[agent]
-                f2 = g2 in self.env.fist_geoms[agent]
-                if not (f1 or f2):
-                    # body-to-body contact that isn't a fist strike = foul
-                    # (clinch / shove / leg / shoulder). Penalize lightly.
+                # Check if either geom is a legal weapon (fist or foot)
+                weapons = self.env.fist_geoms[agent]
+                is_weapon = False
+                for is_fist, wgid in weapons:
+                    if g1 == wgid or g2 == wgid:
+                        is_weapon = True
+                        break
+                if not is_weapon:
                     fouled = True
         return fouled
 
