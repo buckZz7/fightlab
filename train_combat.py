@@ -220,21 +220,6 @@ class CombatEnv(G1FighterEnv):
         if pelvis_z > 0.7:
             reward += 0.5
 
-        # DEFENSE: reward keeping hands up (guard position) when opponent is close
-        # Guard = wrists above shoulders, close to head. This protects against
-        # head hits (2x damage) and incentivizes blocking.
-        if dist < 1.0:  # opponent within striking range
-            off = 0 if agent == 0 else 36
-            head_z = self.data.xpos[self.model.body(
-                f"{'r1_' if agent == 0 else 'r2_'}head_link").id][2]
-            for side in ("left", "right"):
-                pfx = "r1_" if agent == 0 else "r2_"
-                wrist_z = self.data.xpos[self.model.body(
-                    f"{pfx}{side}_wrist_yaw_link").id][2]
-                # Reward wrist near or above head height (guard up)
-                if wrist_z > head_z - 0.05:
-                    reward += 0.3  # hand is up = guarding
-
         # Action smoothness
         if hasattr(self, "_prev_act"):
             reward -= 0.01 * float(np.sum((action - self._prev_act) ** 2))
