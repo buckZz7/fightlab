@@ -9,7 +9,7 @@ Autonomous humanoid combat league — Unitree G1 robots learn to fight via RL in
 | 1. Motion Tracker | `train_motion_tracker.py` | Imitates combat mocap (punches, kicks, blocks) → balance + movement |
 | 2. Combat Fine-Tune | `train_combat.py` | RL with combat rewards on top of tracker → learns to fight |
 | 3. League | `league.py` | Round-robin bouts with ELO scoring → king of the hill |
-| 4. Title Bout | `egl_bout.py` | Challenger vs king → rendered video |
+| 4. Title Bout | `eval.py egl_bout` | Challenger vs king → rendered video |
 | Evolution | `evolve.py` | Auto-trains new challengers against past kings → always improving |
 
 ## Combat Rules
@@ -31,7 +31,7 @@ Autonomous humanoid combat league — Unitree G1 robots learn to fight via RL in
    ```
 3. Test locally:
    ```bash
-   python3 deterministic_eval.py --fighter models/my_fighter.zip
+   python3 eval.py deterministic_eval --fighter models/my_fighter.zip
    ```
 4. Submit a PR adding `models/my_fighter.zip`
 5. CI auto-runs trustless eval (deterministic, multi-seed, auditable)
@@ -57,21 +57,13 @@ Autonomous humanoid combat league — Unitree G1 robots learn to fight via RL in
 
 ```
 street_arena.py           Arena builder (2 G1s, navy checkerboard, tracking camera)
-g1_fighter_env.py         Combat env (weapons, damage, facing, balance)
-combat_rules.py           Rules engine (10-point must, KO, draw, fouls)
-bout_fighter.py           ShadowBoxer opponents (punch, kick, dodge, guard)
-egl_bout.py               EGL render pipeline (720p, tracking camera)
-train_motion_tracker.py  Stage 1: mocap imitation training
-train_combat.py           Stage 2: combat fine-tuning
-league.py                 Stage 3: round-robin + ELO
+g1_fighter_env.py         Combat env + MoveCoach + loco_base29 (PD/HOME, weapons, damage, facing)
+combat.py                 Rules engine (CombatJudge) + ShadowBoxer opponents + bout renderer
+eval.py                   Deterministic eval + CI gate + bout overlay + test damage + eval tracker + egl bout
+league.py                 Round-robin + ELO + page gen + auto-update + render
+train_motion_tracker.py   Stage 1: mocap imitation training (+ AMP discriminator)
+train_combat.py           Stage 2: combat fine-tuning (protected — training in progress)
 evolve.py                 Evolution loop (auto-train challengers)
-deterministic_eval.py     Trustless eval (multi-seed, hashed, logged)
-ci_gate.py                CI merge gate
-amp.py                    Adversarial motion prior discriminator
-gen_league_page.py        League standings HTML page
-bout_overlay.py           HP bars + timer overlay on videos
-loco_base29.py            PD controller + HOME pose
-g1_moves_reward.py        MoveCoach (motion reward)
 docs/                     GitHub Pages site (standings + bouts)
 .github/workflows/        CI: trustless league gate
 ```

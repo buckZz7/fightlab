@@ -33,9 +33,9 @@ jobs:
 
       - name: Anti-tampering check (core files not modified)
         run: |
-          PROTECTED=("bout_fighter.py" "g1_fighter_env.py" "combat_rules.py"
-                     "street_arena.py" "deterministic_eval.py" "ci_gate.py"
-                     "loco_base29.py" "g1_moves_reward.py")
+          PROTECTED=("combat.py" "g1_fighter_env.py" "eval.py"
+                     "street_arena.py" "league.py"
+                     "loco_base29.py" "g1_moves_reward.py" "bout_fighter.py")
           CHANGED=$(git diff --name-only origin/main...HEAD)
           for f in "${PROTECTED[@]}"; do
             if echo "$CHANGED" | grep -q "^$f$"; then
@@ -63,7 +63,7 @@ jobs:
       - name: Run deterministic eval
         if: steps.find.outputs.fighter != ''
         run: |
-          python3 deterministic_eval.py \
+          python3 eval.py deterministic_eval \
             --fighter "${{ steps.find.outputs.fighter }}" \
             --out eval_result.json
 

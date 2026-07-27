@@ -116,7 +116,7 @@ def run_league(challenger, cycle):
     run(cmd, timeout=3600)
 
     # Generate page
-    run(f"python3 gen_league_page.py --standings {LEAGUE_FILE} --out docs/index.html")
+    run(f"python3 league.py page --standings {LEAGUE_FILE} --out docs/index.html")
 
     # Check results
     d = json.load(open(LEAGUE_FILE))
@@ -135,7 +135,7 @@ def title_bout(challenger, king_model, cycle):
 
     out = os.path.join(TITLE_BOUT_DIR, f"title_cycle{cycle}.mp4")
     cmd = (
-        f"python3 egl_bout.py"
+        f"python3 eval.py egl_bout"
         f" --p1 {challenger}.zip"
         f" --steps 5000"
         f" --out {out}"

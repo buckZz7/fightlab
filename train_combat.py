@@ -77,6 +77,7 @@ class CombatEnv(G1FighterEnv):
         self._dmg_taken = [0.0, 0.0]
         self._prev_act = np.zeros(ACT_DIM)
         self.native = HOME.copy()
+        self.torque_noise_std = 0.0  # deterministic by default
 
     def _place(self):
         """Combat curriculum: randomize start distance.

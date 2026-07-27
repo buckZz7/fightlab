@@ -23,8 +23,154 @@ import mujoco
 import gymnasium as gym
 
 from street_arena import build_default_2bot
-from loco_base29 import StandPD, KP, KD, HOME
-from g1_moves_reward import MoveCoach
+
+# ---------------------------------------------------------------------------
+# loco_base29.py — PD controller + HOME pose (inlined; only used here)
+# ---------------------------------------------------------------------------
+# PD gains (per-joint, 29-DoF order matching the model):
+#   legs 0-11 (hip_pitch,hip_roll,hip_yaw,knee,ankle_pitch,ankle_roll x2)
+#   waist 12-14 (yaw,roll,pitch)
+#   arms 15-28 (l_shoulder_p,r,y, l_elbow, l_wrist_r,p,y, r_shoulder..., r_elbow, r_wrist...)
+KP = np.array([150, 150, 150, 300, 40, 40,        # L leg: hip,hip,hip,knee,ank,ank
+               150, 150, 150, 300, 40, 40,        # R leg
+               250, 250, 250,                      # waist yaw,roll,pitch
+               100, 100, 100, 100, 100, 10, 10,    # L arm: sh_p,sh_r,sh_y,elbow,wrist_r,wrist_p,wrist_y
+               100, 100, 100, 100, 100, 10, 10])   # R arm
+KD = np.array([2, 2, 2, 4, 2, 2,
+               2, 2, 2, 4, 2, 2,
+               5, 5, 5,
+               2, 2, 2, 2, 2, 2, 2,
+               2, 2, 2, 2, 2, 2, 2])
+
+# Standing pose (joint targets from neutral + slight knee/hip bend).
+HOME = np.array([-0.1, 0, 0, 0.3, -0.2, 0,
+                 -0.1, 0, 0, 0.3, -0.2, 0,
+                 0, 0, 0,
+                 0.35, 0.18, 0, 0.87, 0, 0, 0,
+                 0.35, -0.18, 0, 0.87, 0, 0, 0])
+
+# Per-joint scale for residuals (how far the policy can push from HOME).
+SCALE = np.array([0.55, 0.35, 0.55, 0.35, 0.44, 0.44,
+                  0.55, 0.35, 0.55, 0.35, 0.44, 0.44,
+                  0.55, 0.44, 0.44,
+                  0.44, 0.44, 0.44, 0.44, 0.44, 0.07, 0.07,
+                  0.44, 0.44, 0.44, 0.44, 0.44, 0.07, 0.07])
+
+
+class StandPD:
+    """Stable standing substrate: PD-to-HOME on all 29 joints.
+
+    No ONNX. Holds the robot upright. The fight policy overrides
+    the ARM portion (15:29) with learned residuals to punch, and
+    can nudge the leg targets slightly for footwork.
+    """
+    def __init__(self):
+        self.target = HOME.copy()
+        self.cmd = np.zeros(3, dtype=np.float32)
+
+    def set_command(self, vx=0.0, vy=0.0, wz=0.0):
+        self.cmd[:] = [vx, vy, wz]
+
+    def update(self, qpos, qvel, off=0):
+        return self.target
+
+    def pd_torque(self, qpos, qvel, off=0, target_override=None):
+        t = self.target if target_override is None else target_override
+        n = len(KP)  # 29 joints
+        qv_off = off + 6 - (1 if off > 0 else 0)
+        return KP * (t - qpos[off+7:off+7+n]) - KD * qvel[qv_off:qv_off+n]
+
+    def reset(self):
+        self.target = HOME.copy()
+        self.cmd[:] = 0
+
+
+class LocoBase29:
+    """DEPRECATED: unitree ONNX balance base. Verified UNSTABLE
+    (falls 2.8s-13.4s). Kept only for reference / ablation.
+    Use StandPD instead.
+    """
+    def __init__(self, onnx_path=None):
+        raise RuntimeError(
+            "LocoBase29 (ONNX) is UNSTABLE (falls 2.8-13.4s). "
+            "Use StandPD instead.")
+
+
+# ---------------------------------------------------------------------------
+# g1_moves_reward.py — MoveCoach (motion-match reward, inlined; only used here)
+# ---------------------------------------------------------------------------
+MOVE_FILES = {
+    "jab": "M_ShortMove12_quickjab",
+    "lowpunch": "M_Move2_lowpunch",
+    "rapidpunch": "M_Move7_rapidpunch",
+}
+
+
+def load_refs(motion_dir):
+    """Load arm (15:29) trajectories + fps from the G1 Moves clips."""
+    refs = {}
+    for name, fn in MOVE_FILES.items():
+        p = os.path.join(motion_dir, "motion", f"{fn}.npz")
+        if not os.path.exists(p):
+            continue
+        m = np.load(p)
+        jp = m["joint_pos"].astype(np.float32)
+        refs[name] = {
+            "arm": jp[:, 15:29].copy(),          # (T, 14) arm joints
+            "fps": float(m.get("fps", 60.0)),
+            "T": jp.shape[0],
+        }
+    return refs
+
+
+def _sample_ref(ref, t, dt):
+    """Sample the ref arm pose at time t (seconds)."""
+    fi = int(t * ref["fps"]) % ref["T"]
+    return ref["arm"][fi]
+
+
+def motion_match_bonus(refs, name, arm_qpos, t, dt, scale=0.5):
+    """Bonus for matching the named punch's arm shape.
+
+    arm_qpos: (14,) current arm joints (15:29).
+    Returns 0..scale (higher = closer shape match).
+    name=None -> no bonus.
+    """
+    if name is None or name not in refs:
+        return 0.0
+    ref = refs[name]
+    target = _sample_ref(ref, t, dt)
+    err = np.mean((arm_qpos - target) ** 2)
+    return float(scale * np.exp(-err / 0.10))
+
+
+class MoveCoach:
+    """Tracks which punch is 'active' and feeds motion-match bonus.
+
+    A fight policy emits a discrete punch command (or we cycle). For now
+    the coach is fed (name, t_in_punch) each step by the env/rollout
+    and returns the bonus. Keeps the reward modular.
+    """
+
+    def __init__(self, motion_dir):
+        self.refs = load_refs(motion_dir)
+        self.active = None
+        self.t = 0.0
+
+    def reset(self):
+        self.active = None
+        self.t = 0.0
+
+    def start(self, name):
+        self.active = name
+        self.t = 0.0
+
+    def step(self, arm_qpos, dt):
+        if self.active is None:
+            return 0.0
+        self.t += dt
+        b = motion_match_bonus(self.refs, self.active, arm_qpos, self.t, dt)
+        return b
 
 DT = 0.002   # RK4 stable timestep
 FRAME_SKIP = 1   # control every physics step (500Hz)

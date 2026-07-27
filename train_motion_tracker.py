@@ -25,6 +25,127 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
+
+# ===========================================================================
+# amp.py — Adversarial Motion Prior discriminator (inlined; only used here)
+# ===========================================================================
+# AMP: Adversarial Motion Prior discriminator.
+#
+# RoboStriker showed that dropping AMP reduces hit rate from 0.685 to 0.49.
+# AMP adds a style reward that keeps the fighter's motion looking natural
+# (like the mocap) instead of degenerating into robotic flailing.
+#
+# Lightweight implementation: a simple MLP discriminator that distinguishes
+# real mocap motion from policy-generated motion. The reward = how much
+# the policy's motion looks like real combat.
+try:
+    import torch
+    import torch.nn as nn
+    _HAS_TORCH = True
+except Exception:  # torch optional; AMP just disabled if missing
+    _HAS_TORCH = False
+
+
+if _HAS_TORCH:
+
+    class AMPDiscriminator(nn.Module):
+        """Simple MLP discriminator: real mocap vs policy motion.
+
+        Input: joint positions + velocities (58-dim = 29 pos + 29 vel)
+        Output: 1 (real) or 0 (fake) probability
+        """
+        def __init__(self, input_dim=58, hidden=128):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(input_dim, hidden),
+                nn.ReLU(),
+                nn.Linear(hidden, hidden),
+                nn.ReLU(),
+                nn.Linear(hidden, 1),
+                nn.Sigmoid()
+            )
+
+        def forward(self, x):
+            return self.net(x)
+
+        def compute_reward(self, obs):
+            """AMP reward: how much this motion looks like real combat.
+
+            reward = -log(1 - D(obs)) — high when D thinks it's real.
+            """
+            with torch.no_grad():
+                x = torch.FloatTensor(obs).unsqueeze(0)
+                d = self.net(x).item()
+                d = max(0.01, min(0.99, d))
+                return -np.log(1.0 - d)
+
+        def train_step(self, real_obs, fake_obs, optimizer):
+            """Train discriminator: real=1, fake=0.
+
+            real_obs: list of mocap joint states (58-dim each)
+            fake_obs: list of policy-generated joint states
+            """
+            real = torch.FloatTensor(np.array(real_obs))
+            fake = torch.FloatTensor(np.array(fake_obs))
+
+            pred_real = self.net(real).squeeze(-1)
+            loss_real = nn.functional.binary_cross_entropy(
+                pred_real, torch.ones_like(pred_real))
+
+            pred_fake = self.net(fake).squeeze(-1)
+            loss_fake = nn.functional.binary_cross_entropy(
+                pred_fake, torch.zeros_like(pred_fake))
+
+            loss = loss_real + loss_fake
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            return loss.item()
+
+
+    def collect_mocap_samples(motions, n_samples=1000):
+        """Collect real mocap joint states samples for AMP training.
+
+        Returns list of (29 pos + 29 vel) = 58-dim vectors.
+        """
+        samples = []
+        for motion in motions:
+            jp = motion["joint_pos"]
+            jv = motion["joint_vel"]
+            T = len(jp)
+            for _ in range(n_samples // len(motions)):
+                t = np.random.randint(0, T)
+                samples.append(np.concatenate([jp[t], jv[t]]))
+        return samples
+
+
+    def collect_policy_samples(env, model, n_samples=1000):
+        """Collect policy-generated joint state samples."""
+        samples = []
+        obs, _ = env.reset()
+        for _ in range(n_samples):
+            action, _ = model.predict(obs, deterministic=True)
+            obs, _, _, _, _ = env.step(action)
+            off = env.qpos_off
+            qp = env.data.qpos[off + 7:off + 36] - env.home
+            qv = env.data.qvel[off + 6:off + 35]
+            samples.append(np.concatenate([qp, qv]))
+        return samples
+
+else:  # torch not available — stubs so imports never fail
+    class AMPDiscriminator:
+        def __init__(self, *a, **k):
+            raise RuntimeError("AMP requires torch, which is not installed.")
+    def collect_mocap_samples(*a, **k):
+        raise RuntimeError("AMP requires torch, which is not installed.")
+    def collect_policy_samples(*a, **k):
+        raise RuntimeError("AMP requires torch, which is not installed.")
+
+
+# ===========================================================================
+# Motion tracker env + training (was train_motion_tracker.py)
+# ===========================================================================
 DT = 0.002
 FRAME_SKIP = 4  # control at 125Hz (physics 500Hz / 4)
 CONTROL_DT = DT * FRAME_SKIP  # 0.008s per control step
@@ -216,7 +337,7 @@ def main():
     # Initialize AMP discriminator if enabled
     amp_disc = None
     if a.amp:
-        from amp import AMPDiscriminator, collect_mocap_samples
+        # AMPDiscriminator is now defined in this module (inlined from amp.py)
         amp_disc = AMPDiscriminator(input_dim=58)
         real_samples = collect_mocap_samples(motions, n_samples=2000)
         print(f"[tracker] AMP enabled with {len(real_samples)} real samples")
