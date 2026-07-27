@@ -31,6 +31,21 @@ jobs:
           echo "G1_MESH_DIR=$PWD/unitree_mujoco/unitree_robots/g1/meshes" >> $GITHUB_ENV
           echo "MUJOCO_GL=osmesa" >> $GITHUB_ENV
 
+      - name: Anti-tampering check (core files not modified)
+        run: |
+          PROTECTED=("bout_fighter.py" "g1_fighter_env.py" "combat_rules.py"
+                     "street_arena.py" "deterministic_eval.py" "ci_gate.py"
+                     "loco_base29.py" "g1_moves_reward.py")
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+          for f in "${PROTECTED[@]}"; do
+            if echo "$CHANGED" | grep -q "^$f$"; then
+              echo "❌ REJECTED: PR modifies protected file: $f"
+              echo "Only models/*.zip changes are allowed."
+              exit 1
+            fi
+          done
+          echo "✅ No protected files modified"
+
       - name: Find submitted fighter
         id: find
         run: |

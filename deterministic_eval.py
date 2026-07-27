@@ -23,10 +23,12 @@ from combat_rules import CombatJudge
 from bout_fighter import ShadowBoxer
 
 # Fixed seed for ALL bouts — makes results reproducible
-EVAL_SEED = 42
+EVAL_SEEDS = [42, 123, 777]  # multiple seeds to prevent overfitting
 EVAL_STEPS = 5000
 ROUND_SECONDS = 20.0
 ROUNDS = 3
+MAX_MODEL_SIZE = 50 * 1024 * 1024  # 50MB limit
+MIN_DAMAGE_TO_PASS = 1.0  # must deal at least 1 damage (not just survive)
 
 
 def model_hash(path):
@@ -38,7 +40,7 @@ def model_hash(path):
     return h.hexdigest()[:16]
 
 
-def run_bout(fighter_path, opponent_spec, seed=EVAL_SEED):
+def run_bout(fighter_path, opponent_spec, seed=42):
     """Run a single deterministic bout. Returns bout log."""
     env = G1FighterEnv(max_steps=EVAL_STEPS, randomize=False)
 
@@ -111,42 +113,60 @@ def main():
 
     print(f"[eval] fighter: {a.fighter}")
     print(f"[eval] hash: {model_hash(a.fighter)}")
-    print(f"[eval] seed: {EVAL_SEED} (deterministic)")
+    print(f"[eval] seeds: {EVAL_SEEDS} (multi-seed anti-overfit)")
+
+    # Model size check (anti-DoS)
+    fsize = os.path.getsize(a.fighter)
+    if fsize > MAX_MODEL_SIZE:
+        print(f"[eval] REJECTED: model too large ({fsize / 1e6:.1f}MB > {MAX_MODEL_SIZE / 1e6:.0f}MB)")
+        sys.exit(1)
 
     results = []
     all_entrants = [a.fighter] + a.entrants
     if a.king:
         all_entrants.append(a.king)
 
-    # Run fighter vs each opponent
-    for opp in a.entrants:
-        print(f"[eval] vs {opp}...", end=" ", flush=True)
-        log = run_bout(a.fighter, opp)
-        results.append(log)
-        print(f"hp={log['final_hp']} result={log['result']['method']}")
+    # Run fighter vs each opponent across ALL seeds
+    for seed in EVAL_SEEDS:
+        for opp in a.entrants:
+            print(f"[eval] seed={seed} vs {opp}...", end=" ", flush=True)
+            log = run_bout(a.fighter, opp, seed=seed)
+            log["seed"] = seed
+            results.append(log)
+            print(f"hp={log['final_hp']} result={log['result']['method']}")
 
-    # Title bout vs king
+    # Title bout vs king (all seeds)
     if a.king:
-        print(f"[eval] TITLE BOUT vs king...", end=" ", flush=True)
-        log = run_bout(a.fighter, a.king)
-        log["title_bout"] = True
-        results.append(log)
-        print(f"hp={log['final_hp']} result={log['result']['method']}")
+        for seed in EVAL_SEEDS:
+            print(f"[eval] seed={seed} TITLE BOUT vs king...", end=" ", flush=True)
+            log = run_bout(a.fighter, a.king, seed=seed)
+            log["title_bout"] = True
+            log["seed"] = seed
+            results.append(log)
+            print(f"hp={log['final_hp']} result={log['result']['method']}")
 
-    # Summary
+    # Summary with anti-gaming checks
     wins = sum(1 for r in results if r["result"]["winner"] == 0)
     losses = sum(1 for r in results if r["result"]["winner"] == 1)
     draws = len(results) - wins - losses
+    # Must deal actual damage (not just survive opponent falling)
+    total_dmg_dealt = sum(sum(e["dmg_dealt"] for e in r["events"]) for r in results)
+    # Must win on at least 2 different seeds (anti-overfit)
+    seeds_won = set(r["seed"] for r in results if r["result"]["winner"] == 0)
 
     summary = {
         "fighter": os.path.basename(a.fighter),
         "fighter_hash": model_hash(a.fighter),
-        "seed": EVAL_SEED,
+        "model_size_mb": round(fsize / 1e6, 1),
+        "seeds": EVAL_SEEDS,
         "total_bouts": len(results),
         "wins": wins,
         "losses": losses,
         "draws": draws,
-        "pass": wins >= 1,
+        "total_damage_dealt": round(total_dmg_dealt, 2),
+        "seeds_won_on": sorted(seeds_won),
+        # Gate: ≥1 win + dealt damage + won on ≥2 seeds
+        "pass": wins >= 1 and total_dmg_dealt >= MIN_DAMAGE_TO_PASS and len(seeds_won) >= 2,
         "bouts": results,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
