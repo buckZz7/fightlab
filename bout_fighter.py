@@ -179,7 +179,7 @@ def main():
         env.opponent = ShadowBoxer(env, style="blue")
 
     cam = _make_camera(a, env)
-    rend = mujoco.Renderer(env.model, height=540, width=960)
+    rend = mujoco.Renderer(env.model, height=720, width=1280)
 
     frames = []
     obs, _ = env.reset()
@@ -188,8 +188,11 @@ def main():
     while not done and t < a.steps:
         a1, _ = p1.predict(obs, deterministic=True)
         obs, rew, term, trunc, info = judge.step(a1)
-        rend.update_scene(env.data, camera=cam)
-        frames.append(rend.render())
+        try:
+            rend.update_scene(env.data, camera=cam)
+            frames.append(rend.render())
+        except Exception:
+            pass  # skip frames with EGL errors
         done = (not a.no_terminate) and (
             term or trunc or judge.ko or (judge.winner is not None))
         t += 1
@@ -198,13 +201,16 @@ def main():
         os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
         # imageio (mp4 via ffmpeg) finalizes containers reliably;
         # cv2 mp4v occasionally drops the moov atom on early stop.
+        import imageio.v2 as imageio
+        # Suppress EGL cleanup errors (known MuJoCo EGL teardown bug)
+        import logging
+        logging.getLogger('OpenGL').setLevel(logging.CRITICAL)
         try:
-            import imageio.v2 as imageio
-            imageio.imsave(a.out, [f[..., ::-1] for f in frames], fps=30)
-        except Exception as e:
+            imageio.imsave(a.out, [f[..., ::-1] for f in frames], fps=30, quality=8)
+        except Exception:
             import cv2
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-            vw = cv2.VideoWriter(a.out, fourcc, 30, (960, 540))
+            vw = cv2.VideoWriter(a.out, fourcc, 30, (1280, 720))
             for f in frames:
                 vw.write(np.ascontiguousarray(f[..., ::-1]))
             vw.release()
