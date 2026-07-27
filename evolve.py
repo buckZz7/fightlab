@@ -41,20 +41,31 @@ def get_king_model():
     king = get_king()
     if king is None:
         return None
-    # king is a name like "fighter_v2.zip" or "scripted:pd"
+    # king is a name like "fighter_v4.zip" or "scripted:pd"
     if king.startswith("scripted:"):
         return None  # scripted, no model
-    return f"models/{king}" if not king.endswith(".zip") else f"models/{king}"
+    # king already includes .zip extension
+    path = f"models/{king}"
+    if os.path.exists(path):
+        return path
+    # try without .zip
+    path2 = f"models/{king.replace('.zip', '')}"
+    if os.path.exists(path2 + ".zip"):
+        return path2 + ".zip"
+    return None
 
 
 def archive_king(king_model, cycle):
     """Archive the current king so future challengers can train against it."""
-    if king_model is None or not os.path.exists(king_model + ".zip"):
+    if king_model is None:
+        return None
+    # king_model is already a full path (e.g. "models/fighter_v4.zip")
+    if not os.path.exists(king_model):
         return None
     os.makedirs(KINGS_DIR, exist_ok=True)
     archived = os.path.join(KINGS_DIR, f"king_cycle{cycle}.zip")
     import shutil
-    shutil.copy2(king_model + ".zip", archived)
+    shutil.copy2(king_model, archived)
     print(f"[evolve] archived king -> {archived}", flush=True)
     return archived
 
@@ -62,9 +73,9 @@ def archive_king(king_model, cycle):
 def get_training_opponents(king_model, cycle):
     """Get all past kings + current king for self-play training."""
     opponents = []
-    # Current king
-    if king_model and os.path.exists(king_model + ".zip"):
-        opponents.append(king_model + ".zip")
+    # Current king (already a full path)
+    if king_model and os.path.exists(king_model):
+        opponents.append(king_model)
     # Past kings
     if os.path.exists(KINGS_DIR):
         for f in sorted(os.listdir(KINGS_DIR)):
