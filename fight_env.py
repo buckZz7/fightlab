@@ -140,8 +140,8 @@ class FightEnv(gym.Env):
         # Action/observation space
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(ACT_DIM,), dtype=np.float32)
         # Default obs: [rel_pos(3), rel_vel(3), self_joints(29), self_hp(1), opp_hp(1),
-        #               self_facing(1), dist(1), self_pelvis_z(1), opp_pelvis_z(1)] = 70
-        self.obs_dim = 70
+        #               self_facing(1), dist(1), self_pelvis_z(1), opp_pelvis_z(1)] = 41
+        self.obs_dim = 41
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf,
                                                   shape=(self.obs_dim,), dtype=np.float32)
 
