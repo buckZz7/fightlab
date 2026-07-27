@@ -2,10 +2,10 @@
 
 Fighters (trained PPO policies, or PD baselines, or scripted
 ShadowBoxer profiles) enter the ring, fight each other via
-G1FighterEnv + BoxingJudge, and we score ELO per bout. The king
+G1FighterEnv + CombatJudge, and we score ELO per bout. The king
 is the top-ELO fighter.
 
-Each bout = one 1v1 under boxing rules (3 rounds, KO/fall/decision).
+Each bout = one 1v1 under combat rules (3 rounds, KO/fall/decision).
 
 Entrant types (in --entrants):
   models/fighter_v1        -> trained PPO policy (red loads it)
@@ -25,7 +25,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from g1_fighter_env import G1FighterEnv
-from boxing_rules import BoxingJudge
+from combat_rules import CombatJudge
 from bout_fighter import ShadowBoxer
 
 
@@ -68,7 +68,7 @@ def run_bout(name_a, spec_a, name_b, spec_b, balance, max_steps,
                        max_steps=max_steps, randomize=False)
     # load blue as opponent (r2) via the env's opponent hook
     env.opponent = _load_entrant(spec_b, env, for_blue=True)
-    judge = BoxingJudge(env, round_seconds=round_seconds, rounds=rounds)
+    judge = CombatJudge(env, round_seconds=round_seconds, rounds=rounds)
     red = _load_entrant(spec_a, env, for_blue=False)
     obs, _ = env.reset()
     done = False

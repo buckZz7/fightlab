@@ -1,11 +1,11 @@
-"""Motion Tracker: Stage 1 of the RoboStriker-style boxing pipeline.
+"""Motion Tracker: Stage 1 of the RoboStriker-style combat pipeline.
 
 Trains a single-agent RL policy that learns to track retargeted G1
 mocap motions (from exptech/g1-moves dataset). The policy outputs
 target joint positions for PD control, and is rewarded for matching
 the reference trajectory.
 
-This gives the fighter physical boxing skills (punching, dodging,
+This gives the fighter physical combat skills (punching, dodging,
 footwork) as a foundation before adding combat rewards.
 
 Training on the EGL pod (GPU + fast render):

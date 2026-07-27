@@ -28,8 +28,8 @@ FOUL_DEDUCTION = 1.0  # points lost per foul (per round cap)
 # require the contact geom to be a fist (enforced in env._update_damage) and
 # block rear-of-head via facing check (attacker must face defender).
 
-class BoxingJudge:
-    """Tracks a single bout under boxing rules. Drives env step + scores."""
+class CombatJudge:
+    """Tracks a single bout under combat rules. Drives env step + scores."""
 
     def __init__(self, env, round_seconds=ROUND_SECONDS, rounds=ROUNDS):
         self.env = env
@@ -135,7 +135,7 @@ class BoxingJudge:
                     self.ko = True
                     self.winner = 1 - a
                     info['tko'] = a
-            # FALL (pelvis below FALL threshold) = round/boxing loss even
+            # FALL (pelvis below FALL threshold) = round/combat loss even
             # if HP not depleted. The env terminates on fall; judge must
             # record the winner as the bot still on its feet.
             if z < 0.40 and self.winner is None:
@@ -217,13 +217,13 @@ class BoxingJudge:
 
 def run_bout(env_factory, red_path, blue_path, rounds=ROUNDS,
              round_seconds=ROUND_SECONDS, render=False):
-    """Run a full bout under boxing rules. red_path/blue_path are policy paths.
+    """Run a full bout under combat rules. red_path/blue_path are policy paths.
 
     Returns a standardized result dict used by league.py challenge/gauntlet.
     """
     from stable_baselines3 import PPO
     env = env_factory()
-    judge = BoxingJudge(env, round_seconds=round_seconds, rounds=rounds)
+    judge = CombatJudge(env, round_seconds=round_seconds, rounds=rounds)
     red = PPO.load(red_path, env=env)
     # blue policy is loaded inside env via opponent_model2 (bout mode)
     obs, _ = env.reset()

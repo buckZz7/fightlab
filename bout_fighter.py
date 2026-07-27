@@ -34,7 +34,7 @@ import mujoco
 from stable_baselines3 import PPO
 
 from g1_fighter_env import G1FighterEnv
-from boxing_rules import BoxingJudge
+from combat_rules import CombatJudge
 
 
 class ShadowBoxer:
@@ -166,7 +166,7 @@ def main():
 
     env = G1FighterEnv(balance_path=a.balance, opponent_path=a.p2,
                        max_steps=a.steps, randomize=False, demo=a.demo)
-    judge = BoxingJudge(env, round_seconds=a.max_round_seconds,
+    judge = CombatJudge(env, round_seconds=a.max_round_seconds,
                         rounds=a.rounds)
 
     if a.demo or not a.p1:

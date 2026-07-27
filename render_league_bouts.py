@@ -22,7 +22,7 @@ import imageio_ffmpeg
 import subprocess
 
 from g1_fighter_env import G1FighterEnv
-from boxing_rules import BoxingJudge
+from combat_rules import CombatJudge
 from league import _load_entrant
 
 
@@ -31,7 +31,7 @@ def render_bout(spec_a, spec_b, balance, out, steps):
     env = G1FighterEnv(balance_path=balance, opponent_path=None,
                        max_steps=steps, randomize=False)
     env.opponent = _load_entrant(spec_b, env, for_blue=True)
-    judge = BoxingJudge(env, round_seconds=30.0, rounds=3)
+    judge = CombatJudge(env, round_seconds=30.0, rounds=3)
     red = _load_entrant(spec_a, env, for_blue=False)
 
     cam_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_CAMERA, "broadcast")

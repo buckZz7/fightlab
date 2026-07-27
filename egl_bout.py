@@ -9,7 +9,7 @@ import numpy as np
 import mujoco
 from g1_fighter_env import G1FighterEnv
 from bout_fighter import ShadowBoxer
-from boxing_rules import BoxingJudge
+from combat_rules import CombatJudge
 import PIL.Image
 import argparse
 
@@ -23,7 +23,7 @@ a = ap.parse_args()
 
 env = G1FighterEnv(max_steps=a.steps, randomize=False, demo=(a.p1 is None))
 obs, _ = env.reset()
-judge = BoxingJudge(env, round_seconds=3.0, rounds=3)
+judge = CombatJudge(env, round_seconds=3.0, rounds=3)
 
 if a.p1:
     from stable_baselines3 import PPO
