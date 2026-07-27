@@ -115,8 +115,9 @@ class G1FighterEnv(gym.Env):
         self.fist_geoms = []
         self.torso_bodies = []
         self.leg_bodies = []
-        # Upper body targets (full damage)
-        TORSO = ["torso_link", "head_link",
+        self.head_bodies = []
+        # Upper body targets (full damage) — head excluded (2x damage)
+        TORSO = ["torso_link",
                  "left_shoulder_pitch_link", "right_shoulder_pitch_link",
                  "left_shoulder_roll_link", "right_shoulder_roll_link",
                  "left_shoulder_yaw_link", "right_shoulder_yaw_link",
@@ -128,7 +129,9 @@ class G1FighterEnv(gym.Env):
                  "left_hip_pitch_link", "right_hip_pitch_link",
                  "left_hip_roll_link", "right_hip_roll_link",
                  "left_hip_yaw_link", "right_hip_yaw_link"]
-        # Leg targets (reduced damage — leg kicks count but aren't overpowered)
+        # Head = 2x damage target
+        HEAD = ["head_link"]
+        # Leg targets (reduced damage)
         LEGS = ["left_knee_link", "right_knee_link"]
         for i, pfx in enumerate(["r1_", "r2_"]):
             self.pelvis_id.append(self.model.body(f"{pfx}pelvis").id)
@@ -151,6 +154,12 @@ class G1FighterEnv(gym.Env):
                 if bid >= 0:
                     bodies.add(bid)
             self.torso_bodies.append(bodies)
+            heads = set()
+            for nm in HEAD:
+                bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, f"{pfx}{nm}")
+                if bid >= 0:
+                    heads.add(bid)
+            self.head_bodies.append(heads)
             legs = set()
             for nm in LEGS:
                 bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, f"{pfx}{nm}")
@@ -259,18 +268,23 @@ class G1FighterEnv(gym.Env):
                 for is_fist, wgid in weapons:
                     if g1 == wgid or g2 == wgid:
                         other = b2 if g1 == wgid else b1
-                        # Check if hit target is upper body or legs
-                        is_leg_target = other in self.leg_bodies[opp]
-                        is_torso_target = other in self.torso_bodies[opp]
-                        if not (is_torso_target or is_leg_target):
+                        is_leg = other in self.leg_bodies[opp]
+                        is_torso = other in self.torso_bodies[opp]
+                        if not (is_torso or is_leg):
                             break
                         rel_vel = self._weapon_rel_vel(agent, opp, wgid)
+                        # Determine hit height: head = high on torso
+                        # The G1 has no separate head body — use contact z.
+                        opp_pelvis_z = self.data.xpos[self.pelvis_id[opp]][2]
+                        contact_z = self.data.contact[con].pos[2]
+                        is_head = is_torso and (contact_z > opp_pelvis_z + 0.35)
                         # Damage multipliers:
-                        # - Punch to upper body: 1.0x
-                        # - Kick to upper body: 1.5x (more mass + velocity)
-                        # - Kick to legs: 0.5x (leg kicks count but reduced)
-                        # - Punch to legs: 0.3x (rare, low damage)
-                        if is_leg_target:
+                        # - Head (high hit): 2.0x (devastating, incentivizes blocking)
+                        # - Punch to body: 1.0x | Kick to body: 1.5x
+                        # - Kick to legs: 0.5x | Punch to legs: 0.3x
+                        if is_head:
+                            dmg_mult = 2.0
+                        elif is_leg:
                             dmg_mult = 0.5 if not is_fist else 0.3
                         else:
                             dmg_mult = 1.0 if is_fist else 1.5

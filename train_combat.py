@@ -183,7 +183,7 @@ class CombatEnv(G1FighterEnv):
         return self._get_obs(0), float(reward), terminated, truncated, info
 
     def _combat_reward(self, agent=0, action=None):
-        """Combat rewards: damage + face + approach + survive. Hard fall penalty."""
+        """Combat rewards: damage + face + approach + survive + defense."""
         opp = 1 - agent
         reward = 0.0
 
@@ -193,7 +193,7 @@ class CombatEnv(G1FighterEnv):
             if not cs.get("shove", False):
                 reward += 100.0 * (cs.get("dmg", 0.0) / 8.0)
 
-        # Defensive penalty — getting hit hurts
+        # Defensive penalty — getting hit hurts (head hits hurt more)
         if self._dmg_taken[agent] > 0:
             reward -= 30.0 * (self._dmg_taken[agent] / 8.0)
 
@@ -214,12 +214,26 @@ class CombatEnv(G1FighterEnv):
         in_range = np.exp(-abs(dist - 0.5) / 1.0)
         reward += 1.5 * (1.0 if approach > 0.8 else 0.0) * in_range
 
-        # Balance — HEAVY penalty for falling (the main fix)
+        # Balance — HEAVY penalty for falling
         pelvis_z = self._pelvis_z(agent)
         reward -= 5.0 * max(0.0, 0.5 - pelvis_z)
-        # Bonus for staying upright
         if pelvis_z > 0.7:
             reward += 0.5
+
+        # DEFENSE: reward keeping hands up (guard position) when opponent is close
+        # Guard = wrists above shoulders, close to head. This protects against
+        # head hits (2x damage) and incentivizes blocking.
+        if dist < 1.0:  # opponent within striking range
+            off = 0 if agent == 0 else 36
+            head_z = self.data.xpos[self.model.body(
+                f"{'r1_' if agent == 0 else 'r2_'}head_link").id][2]
+            for side in ("left", "right"):
+                pfx = "r1_" if agent == 0 else "r2_"
+                wrist_z = self.data.xpos[self.model.body(
+                    f"{pfx}{side}_wrist_yaw_link").id][2]
+                # Reward wrist near or above head height (guard up)
+                if wrist_z > head_z - 0.05:
+                    reward += 0.3  # hand is up = guarding
 
         # Action smoothness
         if hasattr(self, "_prev_act"):
