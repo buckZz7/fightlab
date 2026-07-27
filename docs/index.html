@@ -22,43 +22,41 @@
     line-height: 1.6; -webkit-font-smoothing: antialiased;
   }
 
-  /* HERO */
+  /* HERO — text left, video right */
   .hero {
-    position: relative; min-height: 100vh;
-    display: flex; flex-direction: column;
-    justify-content: center; align-items: center;
-    text-align: center; overflow: hidden;
+    position: relative; min-height: 90vh;
+    display: flex; align-items: center;
+    padding: 80px 24px 40px; max-width: 880px; margin: 0 auto;
   }
-  .hero video {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    filter: brightness(0.35) contrast(1.15) saturate(0.8);
-    z-index: 0;
+  .hero-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 48px; align-items: center; width: 100%;
   }
-  .hero-overlay {
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at center, rgba(10,12,16,0.3) 0%, rgba(10,12,16,0.8) 70%, rgba(10,12,16,0.98) 100%);
-    z-index: 1;
-  }
-  .hero-content { position: relative; z-index: 2; padding: 0 24px; max-width: 700px; }
-  .hero h1 {
-    font-size: clamp(40px, 10vw, 88px);
+  .hero-text h1 {
+    font-size: clamp(36px, 7vw, 64px);
     font-weight: 800; letter-spacing: -0.03em;
-    line-height: 0.95; margin-bottom: 12px;
-    background: linear-gradient(180deg, #fff 0%, #999 100%);
+    line-height: 0.95; margin-bottom: 16px;
+    background: linear-gradient(180deg, #fff 0%, #888 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   }
-  .hero h1 .red {
+  .hero-text h1 .red {
     background: linear-gradient(135deg, var(--red), var(--gold));
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   }
-  .hero-sub {
-    font-size: clamp(14px, 2.5vw, 18px);
-    color: var(--mut); margin-bottom: 40px;
-    max-width: 480px; margin-left: auto; margin-right: auto;
+  .hero-text p {
+    font-size: 16px; color: var(--mut);
+    margin-bottom: 32px; max-width: 360px;
   }
-  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero-video {
+    position: relative; border-radius: 14px;
+    overflow: hidden; border: 1px solid var(--line);
+    aspect-ratio: 16/9;
+  }
+  .hero-video video {
+    width: 100%; height: 100%; object-fit: cover;
+    filter: brightness(0.7) contrast(1.1) saturate(0.85);
+  }
 
   .btn {
     display: inline-flex; align-items: center;
@@ -179,8 +177,11 @@
   }
   footer a { color: var(--red); text-decoration: none; }
 
-  @media (max-width: 600px) {
-    .hero-cta { flex-direction: column; align-items: center; }
+  @media (max-width: 700px) {
+    .hero { min-height: auto; padding: 60px 20px 40px; }
+    .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+    .hero-video { order: -1; }
+    .hero-cta { flex-direction: column; align-items: flex-start; }
     .btn { width: 100%; justify-content: center; }
     .king-banner { flex-direction: column; text-align: center; gap: 12px; }
   }
@@ -190,16 +191,19 @@
 
   <!-- HERO -->
   <div class="hero">
-    <video autoplay muted loop playsinline>
-      <source src="bouts/title_bout.mp4" type="video/mp4">
-    </video>
-    <div class="hero-overlay"></div>
-    <div class="hero-content">
-      <h1>Fight<span class="red">Lab</span></h1>
-      <div class="hero-sub">Autonomous humanoid combat league. Unitree G1 robots learn to fight through reinforcement learning. King of the hill, always evolving.</div>
-      <div class="hero-cta">
-        <a href="league.html" class="btn btn-primary">View Standings</a>
-        <a href="https://github.com/buckZz7/fightlab" class="btn btn-secondary">GitHub</a>
+    <div class="hero-grid">
+      <div class="hero-text">
+        <h1>Fight<span class="red">Lab</span></h1>
+        <p>Autonomous humanoid combat league. Unitree G1 robots learn to fight through reinforcement learning. King of the hill, always evolving.</p>
+        <div class="hero-cta">
+          <a href="league.html" class="btn btn-primary">View Standings</a>
+          <a href="https://github.com/buckZz7/fightlab" class="btn btn-secondary">GitHub</a>
+        </div>
+      </div>
+      <div class="hero-video">
+        <video autoplay muted loop playsinline>
+          <source src="bouts/title_bout.mp4" type="video/mp4">
+        </video>
       </div>
     </div>
   </div>
