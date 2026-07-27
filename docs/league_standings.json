@@ -1,52 +1,52 @@
 {
-  "king": "fighter_v3.zip",
+  "king": "fighter_v4.zip",
   "standings": [
     {
-      "name": "fighter_v3.zip",
-      "elo": 1500.0,
+      "name": "fighter_v4.zip",
+      "elo": 1557.2,
+      "W": 7,
+      "L": 2,
+      "D": 6
+    },
+    {
+      "name": "scripted:pd",
+      "elo": 1505.4,
+      "W": 2,
+      "L": 1,
+      "D": 12
+    },
+    {
+      "name": "scripted:jabbler",
+      "elo": 1495.2,
       "W": 0,
       "L": 0,
       "D": 15
     },
     {
       "name": "fighter_v2.zip",
-      "elo": 1500.0,
-      "W": 0,
-      "L": 0,
-      "D": 15
-    },
-    {
-      "name": "scripted:jabbler",
-      "elo": 1500.0,
-      "W": 0,
-      "L": 0,
-      "D": 15
-    },
-    {
-      "name": "scripted:defender",
-      "elo": 1500.0,
+      "elo": 1494.7,
       "W": 0,
       "L": 0,
       "D": 15
     },
     {
       "name": "scripted:balanced",
-      "elo": 1500.0,
+      "elo": 1474.3,
       "W": 0,
-      "L": 0,
-      "D": 15
+      "L": 3,
+      "D": 12
     },
     {
-      "name": "scripted:pd",
-      "elo": 1500.0,
+      "name": "scripted:defender",
+      "elo": 1473.2,
       "W": 0,
-      "L": 0,
-      "D": 15
+      "L": 3,
+      "D": 12
     }
   ],
   "results": [
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "fighter_v2.zip",
       "bout": 1,
       "winner": null,
@@ -60,7 +60,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "fighter_v2.zip",
       "bout": 2,
       "winner": null,
@@ -74,7 +74,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "fighter_v2.zip",
       "bout": 3,
       "winner": null,
@@ -88,7 +88,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:jabbler",
       "bout": 1,
       "winner": null,
@@ -102,7 +102,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:jabbler",
       "bout": 2,
       "winner": null,
@@ -116,7 +116,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:jabbler",
       "bout": 3,
       "winner": null,
@@ -130,130 +130,130 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:defender",
       "bout": 1,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
       "hp": [
-        100.0,
-        100.0
+        90.01624395790436,
+        98.67645016139119
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1516.0,
+      "elo_blue": 1484.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:defender",
       "bout": 2,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
       "hp": [
-        100.0,
-        100.0
+        90.01624395790436,
+        98.67645016139119
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1530.5,
+      "elo_blue": 1469.5
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:defender",
       "bout": 3,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
       "hp": [
-        100.0,
-        100.0
+        90.01624395790436,
+        98.67645016139119
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1543.7,
+      "elo_blue": 1456.3
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:balanced",
       "bout": 1,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
       "hp": [
-        100.0,
+        94.79370375614737,
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1557.7,
+      "elo_blue": 1486.0
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:balanced",
       "bout": 2,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
       "hp": [
-        100.0,
+        94.79370375614737,
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1570.5,
+      "elo_blue": 1473.3
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:balanced",
       "bout": 3,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
       "hp": [
-        100.0,
+        94.79370375614737,
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1582.1,
+      "elo_blue": 1461.6
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:pd",
       "bout": 1,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "scripted:pd",
+      "method": "KO",
       "hp": [
-        100.0,
-        100.0
+        0,
+        85.97212402849848
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1562.4,
+      "elo_blue": 1519.7
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:pd",
       "bout": 2,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
       "hp": [
-        100.0,
+        91.9536156855932,
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1576.5,
+      "elo_blue": 1505.7
     },
     {
-      "red": "fighter_v3.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:pd",
       "bout": 3,
-      "winner": null,
-      "method": "DRAW",
+      "winner": "scripted:pd",
+      "method": "KO",
       "hp": [
-        100.0,
-        100.0
+        0,
+        99.42521681160144
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1557.2,
+      "elo_blue": 1524.9
     },
     {
       "red": "fighter_v2.zip",
@@ -308,8 +308,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1498.0,
+      "elo_blue": 1458.3
     },
     {
       "red": "fighter_v2.zip",
@@ -322,8 +322,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1496.2,
+      "elo_blue": 1460.1
     },
     {
       "red": "fighter_v2.zip",
@@ -336,8 +336,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1494.5,
+      "elo_blue": 1461.7
     },
     {
       "red": "fighter_v2.zip",
@@ -350,8 +350,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1493.0,
+      "elo_blue": 1463.1
     },
     {
       "red": "fighter_v2.zip",
@@ -364,8 +364,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1491.6,
+      "elo_blue": 1464.5
     },
     {
       "red": "fighter_v2.zip",
@@ -378,8 +378,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1490.4,
+      "elo_blue": 1465.8
     },
     {
       "red": "fighter_v2.zip",
@@ -392,8 +392,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1492.0,
+      "elo_blue": 1523.3
     },
     {
       "red": "fighter_v2.zip",
@@ -406,8 +406,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1493.4,
+      "elo_blue": 1521.9
     },
     {
       "red": "fighter_v2.zip",
@@ -420,8 +420,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1494.7,
+      "elo_blue": 1520.6
     },
     {
       "red": "scripted:jabbler",
@@ -434,8 +434,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1498.2,
+      "elo_blue": 1463.5
     },
     {
       "red": "scripted:jabbler",
@@ -448,8 +448,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1496.6,
+      "elo_blue": 1465.1
     },
     {
       "red": "scripted:jabbler",
@@ -462,8 +462,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1495.2,
+      "elo_blue": 1466.5
     },
     {
       "red": "scripted:jabbler",
@@ -476,8 +476,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1493.8,
+      "elo_blue": 1467.1
     },
     {
       "red": "scripted:jabbler",
@@ -490,8 +490,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1492.6,
+      "elo_blue": 1468.3
     },
     {
       "red": "scripted:jabbler",
@@ -504,8 +504,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1491.5,
+      "elo_blue": 1469.5
     },
     {
       "red": "scripted:jabbler",
@@ -518,8 +518,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1492.8,
+      "elo_blue": 1519.2
     },
     {
       "red": "scripted:jabbler",
@@ -532,8 +532,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1494.0,
+      "elo_blue": 1518.0
     },
     {
       "red": "scripted:jabbler",
@@ -546,8 +546,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1495.2,
+      "elo_blue": 1516.9
     },
     {
       "red": "scripted:defender",
@@ -560,8 +560,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1466.7,
+      "elo_blue": 1469.3
     },
     {
       "red": "scripted:defender",
@@ -574,8 +574,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1466.8,
+      "elo_blue": 1469.2
     },
     {
       "red": "scripted:defender",
@@ -588,8 +588,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1466.9,
+      "elo_blue": 1469.1
     },
     {
       "red": "scripted:defender",
@@ -602,8 +602,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1469.2,
+      "elo_blue": 1514.6
     },
     {
       "red": "scripted:defender",
@@ -616,8 +616,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1471.3,
+      "elo_blue": 1512.5
     },
     {
       "red": "scripted:defender",
@@ -630,8 +630,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1473.2,
+      "elo_blue": 1510.6
     },
     {
       "red": "scripted:balanced",
@@ -644,8 +644,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1471.0,
+      "elo_blue": 1508.7
     },
     {
       "red": "scripted:balanced",
@@ -658,8 +658,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1472.7,
+      "elo_blue": 1507.0
     },
     {
       "red": "scripted:balanced",
@@ -672,10 +672,10 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1474.3,
+      "elo_blue": 1505.4
     }
   ],
   "substrate": "PD",
-  "generated_utc": "2026-07-27T04:18:55.733957Z"
+  "generated_utc": "2026-07-27T05:51:28.808849Z"
 }
