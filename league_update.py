@@ -12,7 +12,7 @@ it re-derives standings each time.
 """
 import os, sys, argparse, json, glob, subprocess
 sys.path.insert(0, os.path.dirname(__file__))
-os.environ.setdefault("MUJOCO_GL", "osmesa")
+os.environ.setdefault("MUJOCO_GL", "egl")
 
 
 def sh(cmd):

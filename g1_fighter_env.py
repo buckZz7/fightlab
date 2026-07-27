@@ -147,11 +147,12 @@ class G1FighterEnv(gym.Env):
             off = ai * 36            # each robot = 7 (root) + 29 (joints) = 36 qpos
             self.data.qpos[off:off + 3] = [x, 0, 0.793]   # native G1 height
             # Face each other: r1 (left, ai=0) faces +X, r2 (right, ai=1) faces -X.
-            # quat [w,x,y,z]: identity [1,0,0,0] = +X forward; 180° Y rot = [0,0,1,0] = -X forward.
+            # 180° rotation around Z axis (vertical) = quat [0,0,0,1] = faces -X
+            # without flipping upside down (Y rotation would flip the robot).
             if ai == 0:
                 self.data.qpos[off + 3:off + 7] = [1, 0, 0, 0]   # face +X (toward r2)
             else:
-                self.data.qpos[off + 3:off + 7] = [0, 0, 1, 0]   # face -X (toward r1)
+                self.data.qpos[off + 3:off + 7] = [0, 0, 0, 1]   # face -X (toward r1)
             self.data.qpos[off + 7:off + 36] = self.native[:29]  # HOME joints (29)
         if self.randomize:
             self._randomize()

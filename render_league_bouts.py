@@ -1,110 +1,96 @@
-"""Render league bouts to MP4s for the king-of-the-hill page.
+"""Render league bouts to MP4s using EGL GPU rendering + tracking camera.
 
-Reads league_standings.json, renders the top matchups (king's bouts +
-a couple of others) to docs/bouts/*.mp4 via bout_fighter-style render.
+Reads league_standings.json, renders the top matchups to docs/bouts/*.mp4.
+720p, broadcast tracking camera, navy checkerboard, fast GPU render.
 
 Usage:
-  python3 render_league_bouts.py --standings docs/league_test.json \
-      --pd --steps 600 --out-dir docs/bouts
+  python3 render_league_bouts.py --standings docs/league_standings.json \
+      --pd --steps 5000 --out-dir docs/bouts
 """
 import os, sys, argparse, json
 sys.path.insert(0, os.path.dirname(__file__))
-os.environ.setdefault("MUJOCO_GL", "osmesa")
+os.environ.setdefault("MUJOCO_GL", "egl")
+os.environ.setdefault("G1_SCENE_XML",
+    "/workspace/unitree_mujoco/unitree_robots/g1/scene_29dof.xml")
+os.environ.setdefault("G1_MESH_DIR",
+    "/workspace/unitree_mujoco/unitree_robots/g1/meshes")
 import numpy as np
 import mujoco
 from stable_baselines3 import PPO
+import PIL.Image
+import imageio_ffmpeg
+import subprocess
 
 from g1_fighter_env import G1FighterEnv
 from boxing_rules import BoxingJudge
 from league import _load_entrant
 
 
-def render_bout(spec_a, spec_b, balance, out, steps, king_of=None):
-    """king_of: name of the king fighter among {spec_a, spec_b} -> its
-    robot gets RED gloves (the other is the BLUE challenger)."""
+def render_bout(spec_a, spec_b, balance, out, steps):
+    """Render a single bout to MP4 using EGL + tracking camera."""
     env = G1FighterEnv(balance_path=balance, opponent_path=None,
-                       max_steps=steps, randomize=False, ring="open")
+                       max_steps=steps, randomize=False)
     env.opponent = _load_entrant(spec_b, env, for_blue=True)
-    # king role: red gloves to whichever entrant is the king.
-    # r1 = red-side (drives via env.step), r2 = blue-side (opponent).
-    if king_of == spec_a:
-        env._color_gloves_by_king(0)   # r1 is king -> red
-    elif king_of == spec_b:
-        env._color_gloves_by_king(1)   # r2 is king -> red
     judge = BoxingJudge(env, round_seconds=30.0, rounds=3)
     red = _load_entrant(spec_a, env, for_blue=False)
 
-    cam = mujoco.MjvCamera()
-    cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    # Full-body broadcast close-up: fighters fully in frame (feet+head),
-    # dist 3.0, lookat mid-body z=0.7. Side-on (az=90) profile view.
-    cam.azimuth = 90.0; cam.elevation = 10.0; cam.distance = 3.0
-    cam.lookat[:] = [-0.15, 0, 0.7]
-    rend = mujoco.Renderer(env.model, height=540, width=960)
+    cam_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_CAMERA, "broadcast")
+    r = mujoco.Renderer(env.model, height=720, width=1280)
 
-    frames = []
+    frames_dir = out.replace(".mp4", "_frames")
+    os.makedirs(frames_dir, exist_ok=True)
+
     obs, _ = env.reset()
-    done = False
-    t = 0
-    while not done and t < steps:
-        a1 = red.predict(obs, deterministic=True)[0]
+    n = 0
+    for t in range(steps):
+        a1, _ = red.predict(obs, deterministic=True)
         obs, rew, term, trunc, info = judge.step(a1)
-        rend.update_scene(env.data, camera=cam)
-        frames.append(rend.render())
-        done = term or trunc or judge.ko or (judge.winner is not None)
-        t += 1
-    if frames:
-        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-        import imageio.v2 as imageio
-        # mimsave for a frame SEQUENCE (imsave = single image).
-        # pad short bouts so the container has >= 2 frames.
-        seq = [f[..., ::-1] for f in frames]
-        while len(seq) < 2:
-            seq = seq + seq
-        imageio.mimsave(out, seq, fps=30)
-    card = judge.card()
-    return len(frames), card
+        try:
+            r.update_scene(env.data, camera=cam_id)
+            img = r.render()
+            PIL.Image.fromarray(img).save(f"{frames_dir}/f{t:05d}.png")
+            n += 1
+        except Exception:
+            pass
+        if term or trunc:
+            break
+
+    # Encode with ffmpeg
+    ff = imageio_ffmpeg.get_ffmpeg_exe()
+    subprocess.run([ff, "-y", "-framerate", "30", "-i",
+                    f"{frames_dir}/f%05d.png", "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p", "-crf", "20", out],
+                   capture_output=True)
+    # Clean up frames
+    os.system(f"rm -rf {frames_dir}")
+    print(f"[render] {out} ({n} frames) hp={env.hp}")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--standings", default="docs/league_standings.json")
-    ap.add_argument("--pd", action="store_true")
-    ap.add_argument("--steps", type=int, default=600)
+    ap.add_argument("--standings", required=True)
+    ap.add_argument("--steps", type=int, default=5000)
     ap.add_argument("--out-dir", default="docs/bouts")
     ap.add_argument("--max-bouts", type=int, default=4)
+    ap.add_argument("--pd", action="store_true")
     a = ap.parse_args()
-    balance = None if a.pd else a.balance
 
-    d = json.load(open(a.standings))
-    results = d["results"]
-    king = d.get("king")
-    # pick the top matchups: king's bouts + spread
-    rendered = []
-    seen = set()
-    for r in results:
-        key = (r["red"], r["blue"])
-        if key in seen:
-            continue
-        seen.add(key)
-        if len(rendered) >= a.max_bouts:
-            break
-        out = os.path.join(a.out_dir,
-                            f"{r['red'].replace(':', '_')}_vs_"
-                            f"{r['blue'].replace(':', '_')}.mp4")
-        n, card = render_bout(r["red"], r["blue"], balance, out, a.steps,
-                               king_of=king)
-        r["mp4"] = os.path.relpath(out, os.path.dirname(a.standings))
-        r["n_frames"] = n
-        r["card"] = card
-        rendered.append(r)
-        print(f"[rendered] {out} ({n} frames) winner={card['winner']}")
+    os.makedirs(a.out_dir, exist_ok=True)
+    standings = json.load(open(a.standings))
+    bouts = standings.get("bouts", [])[:a.max_bouts]
 
-    # write back the updated results (with mp4 paths)
-    d["results"] = results
-    with open(a.standings, "w") as f:
-        json.dump(d, f, indent=2)
-    print(f"[done] {len(rendered)} bouts rendered -> {a.out_dir}")
+    for bout in bouts:
+        name_a = bout["a"]
+        name_b = bout["b"]
+        spec_a = bout.get("spec_a", name_a)
+        spec_b = bout.get("spec_b", name_b)
+        fname = f"{name_a}_vs_{name_b}".replace(" ", "_").replace(":", "_")
+        out = os.path.join(a.out_dir, f"{fname}.mp4")
+        print(f"[render] {name_a} vs {name_b} -> {out}")
+        try:
+            render_bout(spec_a, spec_b, None, out, a.steps)
+        except Exception as e:
+            print(f"  [error] {e}")
 
 
 if __name__ == "__main__":
