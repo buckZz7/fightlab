@@ -168,21 +168,34 @@ class CombatJudge:
         return obs, rew, term, trunc, info
 
     def _score_round(self):
-        """10-point must system: round winner gets 10, loser 9 (or less)."""
+        """10-point must system: round winner gets 10, loser 9 (or less).
+        Draw if damage difference < DRAW_THRESHOLD (no coin-flip wins)."""
+        DRAW_THRESHOLD = 2.0  # less than 2 HP difference = draw round (10-10)
         # Compare legal damage dealt this round
         dmg = [100 - self.env.hp[a] for a in range(2)]
         dmg_delta = [dmg[a] - dmg[1 - a] for a in range(2)]
         # Favor the fighter who dealt more damage; fouls cost points
         eff = [dmg_delta[a] - self.foul_points[a] * 0.25 for a in range(2)]
-        if eff[0] > eff[1]:
-            self.round_scores[0].append(10); self.round_scores[1].append(9)
-            self.scores[0] += 10; self.scores[1] += 9
-        elif eff[1] > eff[0]:
-            self.round_scores[1].append(10); self.round_scores[0].append(9)
-            self.scores[1] += 10; self.scores[0] += 9
-        else:
+        delta = eff[0] - eff[1]
+        if abs(delta) < DRAW_THRESHOLD:
+            # Draw round — neither fighter clearly won
             self.round_scores[0].append(10); self.round_scores[1].append(10)
             self.scores[0] += 10; self.scores[1] += 10
+        elif delta > 0:
+            # Dominant round (big damage gap) = 10-8
+            if delta > 15:
+                self.round_scores[0].append(10); self.round_scores[1].append(8)
+                self.scores[0] += 10; self.scores[1] += 8
+            else:
+                self.round_scores[0].append(10); self.round_scores[1].append(9)
+                self.scores[0] += 10; self.scores[1] += 9
+        else:
+            if delta < -15:
+                self.round_scores[1].append(10); self.round_scores[0].append(8)
+                self.scores[1] += 10; self.scores[0] += 8
+            else:
+                self.round_scores[1].append(10); self.round_scores[0].append(9)
+                self.scores[1] += 10; self.scores[0] += 9
 
     def _decide_decision(self):
         if self.winner is not None:
@@ -192,9 +205,14 @@ class CombatJudge:
         elif self.scores[1] > self.scores[0]:
             self.winner = 1
         else:
-            # tiebreak by total damage dealt
+            # Scorecards tied — tiebreak by total damage dealt
             dmg = [100 - self.env.hp[a] for a in range(2)]
-            self.winner = 0 if dmg[0] >= dmg[1] else 1
+            dmg_gap = dmg[0] - dmg[1]
+            if abs(dmg_gap) < 1.0:
+                # Genuine draw — damage within 1 HP. No coin flip.
+                self.winner = None  # draw
+            else:
+                self.winner = 0 if dmg_gap > 0 else 1
 
     def card(self):
         method = "DECISION"
@@ -204,6 +222,8 @@ class CombatJudge:
             method = "DQ"
         elif getattr(self, "_fell", False):
             method = "FALL"
+        elif self.winner is None:
+            method = "DRAW"
         return {
             "rounds": self.rounds,
             "round_scores": self.round_scores,
