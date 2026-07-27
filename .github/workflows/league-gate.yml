@@ -1,6 +1,7 @@
-# FightLab CI — auto-runs league gate on PR submissions
-# Triggers when a PR adds a models/*.zip fighter model
-name: FightLab League Gate
+# FightLab CI — trustless deterministic eval on PR submissions
+# Runs in GitHub Actions (not our pod) so anyone can verify
+# Requires: PR adds a models/*.zip fighter
+name: FightLab Trustless Eval
 
 on:
   pull_request:
@@ -8,7 +9,7 @@ on:
       - 'models/*.zip'
 
 jobs:
-  league-gate:
+  deterministic-eval:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -21,23 +22,69 @@ jobs:
         run: |
           pip install mujoco stable-baselines3 gymnasium numpy imageio Pillow --no-deps
           pip install shimmy cloudpickle
+          sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgles2
+
+      - name: Clone unitree_mujoco (G1 model)
+        run: |
+          git clone https://github.com/unitreerobotics/unitree_mujoco.git
+          echo "G1_SCENE_XML=$PWD/unitree_mujoco/unitree_robots/g1/scene_29dof.xml" >> $GITHUB_ENV
+          echo "G1_MESH_DIR=$PWD/unitree_mujoco/unitree_robots/g1/meshes" >> $GITHUB_ENV
+          echo "MUJOCO_GL=osmesa" >> $GITHUB_ENV
 
       - name: Find submitted fighter
         id: find
         run: |
-          # Find the .zip added in this PR
           FIGHTER=$(git diff --name-only origin/main...HEAD -- 'models/*.zip' | head -1)
           echo "fighter=$FIGHTER" >> $GITHUB_OUTPUT
-          echo "Found fighter: $FIGHTER"
+          echo "### Submitted Fighter" >> $GITHUB_STEP_SUMMARY
+          echo "Path: \`$FIGHTER\`" >> $GITHUB_STEP_SUMMARY
+          # Compute hash
+          if [ -n "$FIGHTER" ] && [ -f "$FIGHTER" ]; then
+            HASH=$(sha256sum "$FIGHTER" | cut -c1-16)
+            echo "hash=$HASH" >> $GITHUB_OUTPUT
+            echo "SHA256: \`$HASH\`" >> $GITHUB_STEP_SUMMARY
+          fi
 
-      - name: Run league gate
+      - name: Run deterministic eval
         if: steps.find.outputs.fighter != ''
         run: |
-          python3 ci_gate.py --fighter "${{ steps.find.outputs.fighter }}" --threshold 1400
+          python3 deterministic_eval.py \
+            --fighter "${{ steps.find.outputs.fighter }}" \
+            --out eval_result.json
 
-      - name: Gate result
+      - name: Publish eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-result
+          path: eval_result.json
+
+      - name: Eval summary
         if: always()
         run: |
-          echo "## FightLab League Gate" >> $GITHUB_STEP_SUMMARY
-          echo "Fighter: ${{ steps.find.outputs.fighter }}" >> $GITHUB_STEP_SUMMARY
-          echo "Result: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          if [ -f eval_result.json ]; then
+            python3 -c "
+          import json
+          d = json.load(open('eval_result.json'))
+          print('### FightLab Trustless Eval', file=__import__('sys').stdout)
+          print(f'Fighter: {d[\"fighter\"]}', file=__import__('sys').stdout)
+          print(f'Hash: \`{d[\"fighter_hash\"]}\`', file=__import__('sys').stdout)
+          print(f'Seed: {d[\"seed\"]} (deterministic, reproducible)', file=__import__('sys').stdout)
+          print(f'Result: {d[\"wins\"]}W {d[\"losses\"]}L {d[\"draws\"]}D', file=__import__('sys').stdout)
+          print(f'Gate: {\"✅ PASS\" if d[\"pass\"] else \"❌ FAIL\"}', file=__import__('sys').stdout)
+          print('', file=__import__('sys').stdout)
+          print('#### Bouts', file=__import__('sys').stdout)
+          for b in d.get('bouts', []):
+              title = ' **(TITLE BOUT)**' if b.get('title_bout') else ''
+              print(f'- vs {b[\"opponent\"]}{title}: HP {b[\"final_hp\"]} → {b[\"result\"][\"method\"]}', file=__import__('sys').stdout)
+          " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Gate check
+        if: steps.find.outputs.fighter != ''
+        run: |
+          python3 -c "
+          import json, sys
+          d = json.load(open('eval_result.json'))
+          sys.exit(0 if d['pass'] else 1)
+          "

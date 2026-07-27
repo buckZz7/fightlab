@@ -33,21 +33,22 @@ MIN_WINS = 1
 def run_league(fighter_path, standings_path, bouts=3, max_steps=5000):
     """Run the league with the submitted fighter + scripted baselines."""
     entrants = [fighter_path] + DEFAULT_ENTRANTS
-    cmd = [sys.executable, "league.py",
-           "--entrants", *entrants,
-           "--pd", "--bouts", str(bouts),
-           "--max_steps", str(max_steps),
-           "--round_seconds", "20",
-           "--out", standings_path]
-    print(f"[ci] running league: {fighter_path}")
+    # Use deterministic eval (trustless, reproducible)
+    cmd = [sys.executable, "deterministic_eval.py",
+           "--fighter", fighter_path,
+           "--out", "/tmp/ci_eval.json"]
+    if os.path.exists("models/fighter_v2.zip"):
+        cmd += ["--king", "models/fighter_v2.zip"]
+    print(f"[ci] running deterministic eval: {fighter_path}")
     t0 = time.time()
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     elapsed = time.time() - t0
-    print(f"[ci] league completed in {elapsed:.0f}s")
+    print(f"[ci] eval completed in {elapsed:.0f}s")
     if r.returncode != 0:
-        print(f"[ci] league FAILED: {r.stderr[-300:]}")
+        print(f"[ci] eval FAILED: {r.stderr[-300:]}")
         return None
-    return json.load(open(standings_path))
+
+    return json.load(open("/tmp/ci_eval.json"))
 
 
 def evaluate(fighter_path, threshold=MIN_ELO):
