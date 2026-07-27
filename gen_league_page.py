@@ -125,6 +125,18 @@ def page(d, bout_map):
   <div class="bouts">{vids if vids else '<div class="sub">No bout videos rendered yet.</div>'}
   </div>
 
+  <h2 style="margin-top:26px">Title Bout</h2>
+  <div class="bout">
+    <div class="bout-head">
+      <span class="red">King: {html.escape(str(king))}</span>
+      <span class="vs">vs</span>
+      <span class="blue">Challenger</span>
+    </div>
+    <video controls muted playsinline loop>
+      <source src="bouts/title_bout.mp4" type="video/mp4">
+    </video>
+  </div>
+
   <footer>
     Generated {html.escape(gen)} UTC &middot; FightLab &middot;
     <a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a>

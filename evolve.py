@@ -199,6 +199,10 @@ def evolve(tracker_path, cycles=5, steps=1000000, envs=16, wait_seconds=0):
         # 5. Report
         print(f"\n[evolve] cycle {cycle} complete. King: {standings.get('king')}", flush=True)
 
+        # 6. Push to site (git commit + push)
+        run("cd /workspace && git add -A && git commit -m 'Evolve cycle {cycle}: king={king}' && git push".format(
+            cycle=cycle, king=standings.get('king', 'unknown')), timeout=60)
+
         if wait_seconds > 0 and cycle < cycles:
             print(f"[evolve] waiting {wait_seconds}s before next cycle...", flush=True)
             time.sleep(wait_seconds)
