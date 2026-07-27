@@ -58,51 +58,126 @@ def page(d, bout_map, title_video="bouts/title_bout.mp4"):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FightLab &mdash; King of the Hill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;700&family=Anton&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root {{ --bg:#0a0c10; --card:#12151c; --line:#232936;
-          --txt:#e6e9ef; --mut:#8b93a3; --acc:#e8443f; --acc2:#2f6fff;
-          --gold:#f4c542; }}
+  :root {{
+    --bg: #0a0a0a; --bg2: #111111; --card: #161616; --line: #222222;
+    --mut: #666666; --red: #e74c3c; --red-dim: #c0392b;
+    --gold: #d4af37; --txt: #f0f0f0;
+  }}
   * {{ box-sizing:border-box; margin:0; padding:0 }}
-  body {{ background:var(--bg); color:var(--txt);
-         font:15px/1.6 system-ui,Segoe UI,Roboto,Helvetica,Arial;
-         max-width:920px; margin:0 auto; padding:28px 18px 60px }}
-  h1 {{ font-size:26px; letter-spacing:.5px }}
-  .sub {{ color:var(--mut); margin-top:4px; font-size:13px }}
-  .king-banner {{ margin:22px 0; padding:20px 22px; border-radius:14px;
-    background:linear-gradient(135deg,#1a1408,#120e05);
-    border:1px solid #4a3a12; }}
-  .king-banner .lbl {{ color:var(--gold); font-size:12px;
-    letter-spacing:2px; text-transform:uppercase }}
-  .king-banner .who {{ font-size:24px; font-weight:700; margin-top:4px }}
-  .card {{ background:var(--card); border:1px solid var(--line);
-          border-radius:14px; padding:18px 20px; margin-top:18px }}
-  h2 {{ font-size:17px; margin-bottom:12px; color:var(--txt) }}
-  table {{ width:100%; border-collapse:collapse; font-variant-numeric:
-          tabular-nums }}
-  th, td {{ text-align:left; padding:9px 10px; border-bottom:
-          1px solid var(--line) }}
-  th {{ color:var(--mut); font-size:12px; text-transform:uppercase;
-       letter-spacing:.5px; font-weight:600 }}
-  td.elo {{ font-weight:700; color:var(--gold) }}
-  td.pos {{ width:36px }}
-  .king-row td {{ background:#1a1610 }}
+  body {{
+    background:var(--bg); color:var(--txt);
+    font-family:'Oswald',sans-serif; font-weight:400;
+    max-width:900px; margin:0 auto; padding:0 24px 60px;
+  }}
+
+  /* Nav back to landing */
+  .nav {{
+    padding:20px 0; border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+  }}
+  .nav a {{
+    font-family:'Anton',sans-serif; font-size:22px;
+    text-transform:uppercase; text-decoration:none;
+    color:var(--txt); letter-spacing:0.02em;
+  }}
+  .nav a .red {{ color:var(--red); }}
+  .nav .back {{
+    font-family:'Oswald',sans-serif; font-size:13px;
+    color:var(--mut); text-transform:uppercase; letter-spacing:0.1em;
+  }}
+  .nav .back:hover {{ color:var(--red); }}
+
+  h1 {{
+    font-family:'Anton',sans-serif; font-size:48px;
+    text-transform:uppercase; letter-spacing:0.02em;
+    margin:32px 0 4px; line-height:0.9;
+  }}
+  h1 .red {{ color:var(--red); }}
+  .sub {{
+    color:var(--mut); font-size:14px;
+    text-transform:uppercase; letter-spacing:0.2em;
+    margin-bottom:24px;
+  }}
+
+  /* King banner */
+  .king-banner {{
+    margin:0 0 24px; padding:28px; border:1px solid var(--red-dim);
+    border-left:4px solid var(--red);
+    background:linear-gradient(135deg, rgba(231,76,60,0.08), transparent);
+  }}
+  .king-banner .lbl {{
+    color:var(--red); font-size:12px;
+    text-transform:uppercase; letter-spacing:0.3em;
+    font-family:'JetBrains Mono',monospace;
+  }}
+  .king-banner .who {{
+    font-family:'Anton',sans-serif; font-size:32px;
+    text-transform:uppercase; margin-top:6px; color:var(--gold);
+  }}
+
+  /* Standings table */
+  .card {{
+    background:var(--card); border:1px solid var(--line);
+    padding:24px; margin:16px 0;
+  }}
+  h2 {{
+    font-family:'Anton',sans-serif; font-size:28px;
+    text-transform:uppercase; margin-bottom:16px;
+    letter-spacing:0.02em;
+  }}
+  h2 .red {{ color:var(--red); }}
+
+  table {{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums }}
+  th, td {{
+    text-align:left; padding:12px 10px;
+    border-bottom:1px solid var(--line);
+    font-family:'Oswald',sans-serif;
+  }}
+  th {{
+    color:var(--mut); font-size:11px; text-transform:uppercase;
+    letter-spacing:0.2em; font-weight:500;
+  }}
+  td.elo {{ font-weight:700; color:var(--gold); font-family:'JetBrains Mono',monospace; }}
+  td.pos {{ width:40px; font-family:'Anton',sans-serif; font-size:20px; color:var(--mut); }}
+  .king-row td {{ background:rgba(231,76,60,0.05); }}
+  .king-row td.elo {{ color:var(--gold); }}
+
+  /* Bouts */
   .bouts {{ display:grid; grid-template-columns:1fr; gap:16px }}
-  .bout {{ background:var(--card); border:1px solid var(--line);
-          border-radius:14px; overflow:hidden }}
-  .bout-head {{ padding:12px 16px; display:flex; gap:10px;
+  .bout {{
+    background:var(--card); border:1px solid var(--line);
+    overflow:hidden;
+  }}
+  .bout-head {{
+    padding:16px; display:flex; gap:12px;
     align-items:center; border-bottom:1px solid var(--line);
-    font-weight:600 }}
-  .bout-head .red {{ color:#ff7b76 }} .bout-head .blue {{ color:#7aa8ff }}
-  .bout-head .vs {{ color:var(--mut); font-weight:400; font-size:12px }}
+    font-family:'Oswald',sans-serif; font-weight:700;
+    text-transform:uppercase; font-size:15px;
+  }}
+  .bout-head .red {{ color:var(--red) }}
+  .bout-head .blue {{ color:#3498db }}
+  .bout-head .vs {{ color:var(--mut); font-weight:400; font-size:12px; letter-spacing:0.2em; }}
   .bout video {{ width:100%; display:block; background:#000; aspect-ratio:16/9 }}
-  .bout-meta {{ padding:10px 16px; color:var(--mut); font-size:13px }}
-  footer {{ margin-top:26px; color:var(--mut); font-size:12px;
-          text-align:center }}
-  a {{ color:var(--acc2) }}
+  .bout-meta {{ padding:12px 16px; color:var(--mut); font-size:13px; }}
+
+  footer {{
+    margin-top:40px; padding:20px 0; border-top:1px solid var(--line);
+    text-align:center; color:var(--mut); font-size:12px;
+    text-transform:uppercase; letter-spacing:0.1em;
+  }}
+  footer a {{ color:var(--red); text-decoration:none; }}
+  a {{ color:var(--red); text-decoration:none; }}
 </style>
 </head>
 <body>
-  <h1>FightLab &#129354; King of the Hill</h1>
+  <div class="nav">
+    <a href="index.html">Fight<span class="red">Lab</span></a>
+    <a href="index.html" class="back">← Back</a>
+  </div>
+  <h1>King of the <span class="red">Hill</span></h1>
   <div class="sub">Autonomous humanoid combat league &middot; MuJoCo + RL
    &middot; substrate: {html.escape(str(sub))}</div>
 

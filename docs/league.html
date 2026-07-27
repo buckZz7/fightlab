@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FightLab &mdash; King of the Hill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;700&family=Anton&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a; --bg2: #111111; --card: #161616; --line: #222222;
+    --mut: #666666; --red: #e74c3c; --red-dim: #c0392b;
+    --gold: #d4af37; --txt: #f0f0f0;
+  }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body {
+    background:var(--bg); color:var(--txt);
+    font-family:'Oswald',sans-serif; font-weight:400;
+    max-width:900px; margin:0 auto; padding:0 24px 60px;
+  }
+
+  /* Nav back to landing */
+  .nav {
+    padding:20px 0; border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .nav a {
+    font-family:'Anton',sans-serif; font-size:22px;
+    text-transform:uppercase; text-decoration:none;
+    color:var(--txt); letter-spacing:0.02em;
+  }
+  .nav a .red { color:var(--red); }
+  .nav .back {
+    font-family:'Oswald',sans-serif; font-size:13px;
+    color:var(--mut); text-transform:uppercase; letter-spacing:0.1em;
+  }
+  .nav .back:hover { color:var(--red); }
+
+  h1 {
+    font-family:'Anton',sans-serif; font-size:48px;
+    text-transform:uppercase; letter-spacing:0.02em;
+    margin:32px 0 4px; line-height:0.9;
+  }
+  h1 .red { color:var(--red); }
+  .sub {
+    color:var(--mut); font-size:14px;
+    text-transform:uppercase; letter-spacing:0.2em;
+    margin-bottom:24px;
+  }
+
+  /* King banner */
+  .king-banner {
+    margin:0 0 24px; padding:28px; border:1px solid var(--red-dim);
+    border-left:4px solid var(--red);
+    background:linear-gradient(135deg, rgba(231,76,60,0.08), transparent);
+  }
+  .king-banner .lbl {
+    color:var(--red); font-size:12px;
+    text-transform:uppercase; letter-spacing:0.3em;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .king-banner .who {
+    font-family:'Anton',sans-serif; font-size:32px;
+    text-transform:uppercase; margin-top:6px; color:var(--gold);
+  }
+
+  /* Standings table */
+  .card {
+    background:var(--card); border:1px solid var(--line);
+    padding:24px; margin:16px 0;
+  }
+  h2 {
+    font-family:'Anton',sans-serif; font-size:28px;
+    text-transform:uppercase; margin-bottom:16px;
+    letter-spacing:0.02em;
+  }
+  h2 .red { color:var(--red); }
+
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums }
+  th, td {
+    text-align:left; padding:12px 10px;
+    border-bottom:1px solid var(--line);
+    font-family:'Oswald',sans-serif;
+  }
+  th {
+    color:var(--mut); font-size:11px; text-transform:uppercase;
+    letter-spacing:0.2em; font-weight:500;
+  }
+  td.elo { font-weight:700; color:var(--gold); font-family:'JetBrains Mono',monospace; }
+  td.pos { width:40px; font-family:'Anton',sans-serif; font-size:20px; color:var(--mut); }
+  .king-row td { background:rgba(231,76,60,0.05); }
+  .king-row td.elo { color:var(--gold); }
+
+  /* Bouts */
+  .bouts { display:grid; grid-template-columns:1fr; gap:16px }
+  .bout {
+    background:var(--card); border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .bout-head {
+    padding:16px; display:flex; gap:12px;
+    align-items:center; border-bottom:1px solid var(--line);
+    font-family:'Oswald',sans-serif; font-weight:700;
+    text-transform:uppercase; font-size:15px;
+  }
+  .bout-head .red { color:var(--red) }
+  .bout-head .blue { color:#3498db }
+  .bout-head .vs { color:var(--mut); font-weight:400; font-size:12px; letter-spacing:0.2em; }
+  .bout video { width:100%; display:block; background:#000; aspect-ratio:16/9 }
+  .bout-meta { padding:12px 16px; color:var(--mut); font-size:13px; }
+
+  footer {
+    margin-top:40px; padding:20px 0; border-top:1px solid var(--line);
+    text-align:center; color:var(--mut); font-size:12px;
+    text-transform:uppercase; letter-spacing:0.1em;
+  }
+  footer a { color:var(--red); text-decoration:none; }
+  a { color:var(--red); text-decoration:none; }
+</style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Fight<span class="red">Lab</span></a>
+    <a href="index.html" class="back">← Back</a>
+  </div>
+  <h1>King of the <span class="red">Hill</span></h1>
+  <div class="sub">Autonomous humanoid combat league &middot; MuJoCo + RL
+   &middot; substrate: PD</div>
+
+  <div class="king-banner">
+    <div class="lbl">&#128081; Current King</div>
+    <div class="who">challenger_1.zip</div>
+  </div>
+
+  <div class="card">
+    <h2>Standings</h2>
+    <table>
+      <thead><tr><th>#</th><th>Fighter</th><th>ELO</th>
+      <th>W</th><th>L</th><th>D</th></tr></thead>
+      <tbody>
+        <tr class="king-row">
+          <td class="pos">&#129351;</td>
+          <td class="name">challenger_1.zip &#128081;</td>
+          <td class="elo">1646</td>
+          <td>12</td><td>0</td><td>0</td>
+        </tr>
+        <tr class="">
+          <td class="pos">&#129352;</td>
+          <td class="name">scripted:jabbler</td>
+          <td class="elo">1543</td>
+          <td>8</td><td>4</td><td>0</td>
+        </tr>
+        <tr class="">
+          <td class="pos">&#129353;</td>
+          <td class="name">scripted:defender</td>
+          <td class="elo">1506</td>
+          <td>6</td><td>6</td><td>0</td>
+        </tr>
+        <tr class="">
+          <td class="pos">4</td>
+          <td class="name">scripted:balanced</td>
+          <td class="elo">1431</td>
+          <td>3</td><td>9</td><td>0</td>
+        </tr>
+        <tr class="">
+          <td class="pos">5</td>
+          <td class="name">scripted:pd</td>
+          <td class="elo">1374</td>
+          <td>1</td><td>11</td><td>0</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 style="margin-top:26px">Bouts</h2>
+  <div class="bouts"><div class="sub">No bout videos rendered yet.</div>
+  </div>
+
+  <h2 style="margin-top:26px">Title Bout</h2>
+  <div class="bout">
+    <div class="bout-head">
+      <span class="red">King: challenger_1.zip</span>
+      <span class="vs">vs</span>
+      <span class="blue">Challenger</span>
+    </div>
+    <video controls muted playsinline loop>
+      <source src="bouts/title_bout.mp4" type="video/mp4">
+    </video>
+  </div>
+
+  <footer>
+    Generated 2026-07-27T02:42:31.756943Z UTC &middot; FightLab &middot;
+    <a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a>
+  </footer>
+</body>
+</html>
