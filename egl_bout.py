@@ -1,5 +1,5 @@
 """EGL 1v1 eval bout: saves frames as PNGs, then ffmpeg encodes."""
-import sys, os
+import sys, os, subprocess
 sys.path.insert(0, os.path.dirname(__file__))
 os.environ.setdefault("MUJOCO_GL", "egl")
 os.environ.setdefault("G1_SCENE_XML", "/workspace/unitree_mujoco/unitree_robots/g1/scene_29dof.xml")
@@ -56,8 +56,13 @@ for t in range(a.steps):
 
 print(f"total: {n_frames} frames, hp={env.hp}", flush=True)
 
-# Encode with ffmpeg
-os.system(f"ffmpeg -y -framerate 30 -i {a.frames_dir}/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 20 {a.out} 2>/dev/null")
+# Encode with imageio_ffmpeg (ffmpeg not installed on pod)
+import imageio_ffmpeg
+ff = imageio_ffmpeg.get_ffmpeg_exe()
+subprocess.run([ff, "-y", "-framerate", "30", "-i", f"{a.frames_dir}/f%05d.png",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", a.out],
+               capture_output=True)
+os.system(f"rm -rf {a.frames_dir}")
 print(f"SAVED {a.out}", flush=True)
 card = judge.card()
 print(f"CARD: winner={card['winner']} method={card['method']} hp={card['final_hp']}", flush=True)
