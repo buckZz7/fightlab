@@ -8,293 +8,326 @@
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
   :root {
-    --bg: #0c0d10;
-    --bg2: #131418;
-    --card: #17181d;
-    --line: #262830;
-    --txt: #e8e9ee;
-    --mut: #7a7d88;
+    --bg: #08080a;
+    --bg2: #0e0e12;
+    --card: #141418;
+    --line: #1c1c22;
+    --line2: #28282e;
+    --txt: #e8e8ec;
+    --mut: #6a6a74;
     --red: #e74c3c;
-    --red-glow: rgba(231, 76, 60, 0.12);
-    --gold: #d4a843;
+    --red2: #c0392b;
+    --red-glow: rgba(231, 76, 60, 0.15);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background: var(--bg); color: var(--txt);
     font-family: 'Space Grotesk', sans-serif;
-    line-height: 1.6; -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+    line-height: 1.65; -webkit-font-smoothing: antialiased;
   }
 
-  /* TOP BAR */
+  /* HEADER */
   header {
     position: sticky; top: 0; z-index: 100;
-    background: rgba(12, 13, 16, 0.85);
+    background: rgba(8, 8, 10, 0.9);
     backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--line);
-    padding: 16px 32px;
+  }
+  .header-inner {
+    max-width: 1100px; margin: 0 auto;
+    padding: 14px 32px;
     display: flex; justify-content: space-between; align-items: center;
   }
   .brand {
-    font-weight: 700; font-size: 16px;
+    font-weight: 700; font-size: 17px;
     letter-spacing: -0.01em; text-decoration: none; color: var(--txt);
+    display: flex; align-items: center; gap: 8px;
   }
-  .brand span { color: var(--red); }
-  .nav-links { display: flex; gap: 28px; }
+  .brand-mark {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: var(--red); display: flex;
+    align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff;
+  }
+  .nav-links { display: flex; gap: 32px; align-items: center; }
   .nav-links a {
     font-size: 13px; font-weight: 500; color: var(--mut);
     text-decoration: none; transition: color 0.2s;
   }
   .nav-links a:hover { color: var(--txt); }
-
-  /* HERO — split layout, video as framed showcase */
-  .hero {
-    max-width: 1000px; margin: 0 auto;
-    padding: 72px 32px 48px;
-    display: grid; grid-template-columns: 1.1fr 1fr;
-    gap: 56px; align-items: center;
-    min-height: 70vh;
+  .nav-links .cta-link {
+    color: var(--red); font-weight: 600;
   }
-  .hero-text .eyebrow {
+
+  /* HERO */
+  .hero {
+    max-width: 1100px; margin: 0 auto;
+    padding: 80px 32px 64px;
+    display: grid; grid-template-columns: 1.1fr 1fr;
+    gap: 64px; align-items: center;
+  }
+  .hero-left .tag {
     display: inline-block; font-size: 12px; font-weight: 600;
     color: var(--red); text-transform: uppercase;
-    letter-spacing: 0.2em; padding: 4px 12px;
-    background: var(--red-glow); border-radius: 4px;
-    margin-bottom: 24px;
+    letter-spacing: 0.15em; padding: 5px 12px;
+    background: var(--red-glow); border-radius: 6px;
+    margin-bottom: 28px;
   }
-  .hero-text h1 {
-    font-size: clamp(36px, 5vw, 56px);
-    font-weight: 700; letter-spacing: -0.03em;
-    line-height: 1.05; margin-bottom: 20px;
+  .hero-left h1 {
+    font-size: clamp(36px, 5.5vw, 60px);
+    font-weight: 700; letter-spacing: -0.035em;
+    line-height: 1.02; margin-bottom: 24px;
   }
-  .hero-text h1 span { color: var(--red); }
-  .hero-text p {
+  .hero-left h1 .red { color: var(--red); }
+  .hero-left p {
     font-size: 17px; color: var(--mut);
-    margin-bottom: 36px; max-width: 420px;
+    margin-bottom: 40px; max-width: 440px; line-height: 1.6;
   }
   .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
   .btn {
     display: inline-flex; align-items: center;
-    padding: 12px 24px; font-size: 14px; font-weight: 600;
+    padding: 13px 28px; font-size: 14px; font-weight: 600;
     text-decoration: none; border-radius: 8px;
     transition: all 0.2s; border: 1px solid transparent;
+    cursor: pointer;
   }
-  .btn-primary { background: var(--red); color: #fff; }
-  .btn-primary:hover { background: #ff5e4e; transform: translateY(-1px); }
+  .btn-primary {
+    background: var(--red); color: #fff;
+    box-shadow: 0 4px 16px rgba(231, 76, 60, 0.25);
+  }
+  .btn-primary:hover { background: #ff5e4e; transform: translateY(-1px); box-shadow: 0 6px 24px rgba(231, 76, 60, 0.35); }
   .btn-ghost {
-    background: transparent; color: var(--txt);
-    border-color: var(--line);
+    background: var(--card); color: var(--txt);
+    border-color: var(--line2);
   }
   .btn-ghost:hover { border-color: var(--red); }
 
   /* Video card */
-  .hero-video {
+  .video-card {
     position: relative; border-radius: 12px;
-    overflow: hidden; border: 1px solid var(--line);
-    aspect-ratio: 16/10; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow: hidden; border: 1px solid var(--line2);
+    aspect-ratio: 16/10;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
   }
-  .hero-video video {
+  .video-card video {
     width: 100%; height: 100%; object-fit: cover;
-    filter: brightness(0.85) contrast(1.05) saturate(0.9);
+    filter: brightness(0.8) contrast(1.05);
   }
-  .hero-video::after {
-    content: 'LIVE'; position: absolute;
-    top: 12px; right: 12px;
+  .video-badge {
+    position: absolute; top: 14px; right: 14px;
+    display: flex; align-items: center; gap: 6px;
     font-size: 10px; font-weight: 700; letter-spacing: 0.15em;
     color: #fff; background: var(--red);
-    padding: 3px 8px; border-radius: 3px;
+    padding: 4px 10px; border-radius: 4px; text-transform: uppercase;
   }
+  .video-badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #fff; animation: blink 1.5s infinite;
+  }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-  /* KING STRIP — horizontal bar below hero */
-  .king-strip {
-    max-width: 1000px; margin: 0 auto;
-    padding: 0 32px 64px;
+  /* CHAMPION BAR */
+  .champion {
+    max-width: 1100px; margin: 0 auto;
+    padding: 0 32px 72px;
   }
-  .king-bar {
-    background: linear-gradient(135deg, rgba(212, 168, 67, 0.08), transparent);
-    border: 1px solid rgba(212, 168, 67, 0.2);
-    border-radius: 12px; padding: 20px 28px;
+  .champion-bar {
+    background: var(--card); border: 1px solid var(--line2);
+    border-left: 3px solid var(--red);
+    border-radius: 10px; padding: 22px 28px;
     display: flex; align-items: center; justify-content: space-between;
+    gap: 20px;
   }
-  .king-bar .left { display: flex; align-items: center; gap: 16px; }
-  .king-bar .crown-mark {
-    width: 36px; height: 36px; border-radius: 8px;
-    background: rgba(212, 168, 67, 0.15);
-    border: 1px solid rgba(212, 168, 67, 0.3);
+  .champion-left { display: flex; align-items: center; gap: 18px; }
+  .champion-badge {
+    width: 44px; height: 44px; border-radius: 8px;
+    background: var(--red-glow); border: 1px solid var(--red);
     display: flex; align-items: center; justify-content: center;
-    font-size: 16px; font-weight: 700; color: var(--gold);
+    font-size: 18px; font-weight: 700; color: var(--red);
   }
-  .king-bar .label {
+  .champion-info .label {
     font-size: 11px; text-transform: uppercase;
-    letter-spacing: 0.15em; color: var(--gold);
+    letter-spacing: 0.2em; color: var(--red);
     font-weight: 600;
   }
-  .king-bar .name {
-    font-size: 18px; font-weight: 600; color: var(--txt);
+  .champion-info .name {
+    font-size: 20px; font-weight: 600; color: var(--txt);
     margin-top: 2px;
   }
-  .king-bar .link {
+  .champion-link {
     font-size: 13px; color: var(--red);
-    text-decoration: none; font-weight: 500;
+    text-decoration: none; font-weight: 500; white-space: nowrap;
   }
-  .king-bar .link:hover { text-decoration: underline; }
+  .champion-link:hover { text-decoration: underline; }
 
   /* SECTIONS */
   .section {
-    max-width: 1000px; margin: 0 auto;
+    max-width: 1100px; margin: 0 auto;
     padding: 80px 32px; border-top: 1px solid var(--line);
   }
   .section-eyebrow {
     font-size: 12px; font-weight: 600;
     color: var(--red); text-transform: uppercase;
-    letter-spacing: 0.2em; margin-bottom: 12px;
+    letter-spacing: 0.2em; margin-bottom: 10px;
   }
   .section h2 {
     font-size: clamp(24px, 4vw, 36px);
-    font-weight: 700; letter-spacing: -0.02em;
+    font-weight: 700; letter-spacing: -0.025em;
     margin-bottom: 48px; line-height: 1.1;
   }
 
-  /* Pipeline — horizontal steps with connecting line */
+  /* Pipeline — horizontal with connecting line */
   .pipeline {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 0; position: relative;
   }
   .pipeline::before {
     content: ''; position: absolute;
-    top: 24px; left: 12%; right: 12%;
-    height: 1px; background: var(--line);
+    top: 26px; left: 12.5%; right: 12.5%;
+    height: 1px; background: var(--line2);
   }
-  .pipeline-step { text-align: center; position: relative; }
-  .pipeline-step .dot {
-    width: 48px; height: 48px; border-radius: 50%;
-    background: var(--bg); border: 2px solid var(--line);
+  .pipeline-step { text-align: center; position: relative; padding: 0 8px; }
+  .pipeline-step .circle {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--bg); border: 2px solid var(--line2);
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto 20px; font-size: 14px; font-weight: 700;
     color: var(--red); position: relative; z-index: 1;
-    transition: border-color 0.2s;
+    transition: all 0.2s;
   }
-  .pipeline-step:hover .dot { border-color: var(--red); }
+  .pipeline-step:hover .circle {
+    border-color: var(--red); background: var(--red-glow);
+  }
   .pipeline-step h3 {
     font-size: 14px; font-weight: 600; margin-bottom: 6px;
   }
   .pipeline-step p {
-    font-size: 13px; color: var(--mut);
-    padding: 0 12px;
+    font-size: 13px; color: var(--mut); line-height: 1.5;
   }
 
-  /* Rules — compact list, two column */
-  .rules-grid {
+  /* Rules — two column key/value */
+  .rules {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 0;
+    border-top: 1px solid var(--line); border-left: 1px solid var(--line);
   }
-  .rule-item {
-    padding: 20px 24px;
+  .rule {
+    padding: 22px 24px;
     border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
   }
-  .rule-item:nth-child(odd) { border-right: 1px solid var(--line); }
-  .rule-item .key {
-    font-size: 13px; font-weight: 600; color: var(--txt);
-    margin-bottom: 2px;
+  .rule .key {
+    font-size: 14px; font-weight: 600; color: var(--txt);
+    margin-bottom: 3px;
   }
-  .rule-item .val {
+  .rule .val {
     font-size: 13px; color: var(--mut);
   }
 
-  /* Enter — horizontal cards */
-  .enter-grid {
+  /* Enter — 2-col cards */
+  .enter {
     display: grid; grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
   .enter-card {
     background: var(--card); border: 1px solid var(--line);
-    border-radius: 10px; padding: 20px;
-    display: flex; gap: 14px; align-items: start;
+    border-radius: 10px; padding: 22px;
+    display: flex; gap: 16px; align-items: start;
     transition: border-color 0.2s;
   }
   .enter-card:hover { border-color: var(--red); }
-  .enter-card .num {
+  .enter-card .step {
     font-size: 14px; font-weight: 700; color: var(--red);
-    min-width: 28px;
+    min-width: 28px; padding-top: 1px;
   }
-  .enter-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .enter-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
   .enter-card p { font-size: 13px; color: var(--mut); }
 
   /* CTA */
-  .cta-section {
-    max-width: 1000px; margin: 0 auto;
+  .cta {
+    max-width: 1100px; margin: 0 auto;
     padding: 100px 32px; border-top: 1px solid var(--line);
     text-align: center;
   }
-  .cta-section h2 { margin-bottom: 16px; }
-  .cta-section p {
+  .cta h2 { margin-bottom: 14px; }
+  .cta p {
     font-size: 16px; color: var(--mut); margin-bottom: 36px;
   }
-  .cta-section .hero-cta { justify-content: center; }
+  .cta .hero-cta { justify-content: center; }
 
   /* Footer */
   footer {
+    max-width: 1100px; margin: 0 auto;
     padding: 32px; border-top: 1px solid var(--line);
-    text-align: center; color: var(--mut); font-size: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--mut); font-size: 12px;
   }
   footer a { color: var(--red); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
 
-  @media (max-width: 700px) {
+  @media (max-width: 760px) {
     .nav-links { display: none; }
-    .hero { grid-template-columns: 1fr; gap: 32px; padding: 48px 20px; min-height: auto; }
-    .hero-video { order: -1; }
-    .pipeline { grid-template-columns: 1fr 1fr; gap: 24px 0; }
+    .hero { grid-template-columns: 1fr; gap: 40px; padding: 48px 20px; }
+    .video-card { order: -1; }
+    .pipeline { grid-template-columns: 1fr 1fr; gap: 32px 0; }
     .pipeline::before { display: none; }
-    .rules-grid { grid-template-columns: 1fr; }
-    .rule-item:nth-child(odd) { border-right: none; }
-    .enter-grid { grid-template-columns: 1fr; }
+    .rules { grid-template-columns: 1fr; }
+    .enter { grid-template-columns: 1fr; }
     .hero-cta { flex-direction: column; align-items: stretch; }
     .btn { width: 100%; justify-content: center; }
-    .king-bar { flex-direction: column; text-align: center; gap: 12px; }
+    .champion-bar { flex-direction: column; text-align: center; }
     .section { padding: 60px 20px; }
-    .king-strip { padding: 0 20px 48px; }
+    .champion { padding: 0 20px 48px; }
+    .cta { padding: 80px 20px; }
+    footer { flex-direction: column; gap: 8px; text-align: center; }
   }
 </style>
 </head>
 <body>
 
   <header>
-    <a href="index.html" class="brand">Fight<span>Lab</span></a>
-    <div class="nav-links">
-      <a href="league.html">Standings</a>
-      <a href="https://github.com/buckZz7/fightlab">GitHub</a>
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <div class="brand-mark">F</div>
+        FightLab
+      </a>
+      <div class="nav-links">
+        <a href="league.html">Standings</a>
+        <a href="https://github.com/buckZz7/fightlab">GitHub</a>
+        <a href="league.html" class="cta-link">View King →</a>
+      </div>
     </div>
   </header>
 
   <!-- HERO -->
   <div class="hero">
-    <div class="hero-text">
-      <div class="eyebrow">Autonomous Combat</div>
-      <h1>Robots that learn to <span>fight</span>.</h1>
-      <p>Unitree G1 humanoids train through reinforcement learning in a king-of-the-hill league. They learn to strike, dodge, and evolve — then challenge the reigning champion.</p>
+    <div class="hero-left">
+      <div class="tag">Autonomous Combat</div>
+      <h1>Robots that learn to <span class="red">fight</span>.</h1>
+      <p>Unitree G1 humanoids train through reinforcement learning in a king-of-the-hill combat league. They learn to strike, dodge, and evolve — then challenge the reigning champion.</p>
       <div class="hero-cta">
         <a href="league.html" class="btn btn-primary">View Standings</a>
         <a href="https://github.com/buckZz7/fightlab" class="btn btn-ghost">GitHub</a>
       </div>
     </div>
-    <div class="hero-video">
+    <div class="video-card">
       <video autoplay muted loop playsinline>
         <source src="bouts/title_bout.mp4" type="video/mp4">
       </video>
+      <div class="video-badge"><span class="dot"></span> Live</div>
     </div>
   </div>
 
-  <!-- KING STRIP -->
-  <div class="king-strip">
-    <div class="king-bar">
-      <div class="left">
-        <div class="crown-mark">K</div>
-        <div>
+  <!-- CHAMPION -->
+  <div class="champion">
+    <div class="champion-bar">
+      <div class="champion-left">
+        <div class="champion-badge">K</div>
+        <div class="champion-info">
           <div class="label">Reigning Champion</div>
           <div class="name" id="king-name">Loading...</div>
         </div>
       </div>
-      <a href="league.html" class="link">Full standings →</a>
+      <a href="league.html" class="champion-link">Full standings →</a>
     </div>
   </div>
 
@@ -304,22 +337,22 @@
     <h2>How fighters are built</h2>
     <div class="pipeline">
       <div class="pipeline-step">
-        <div class="dot">01</div>
+        <div class="circle">01</div>
         <h3>Motion Tracking</h3>
-        <p>Learn combat movement from human motion capture</p>
+        <p>Learn combat movement from human motion capture data</p>
       </div>
       <div class="pipeline-step">
-        <div class="dot">02</div>
+        <div class="circle">02</div>
         <h3>Combat Training</h3>
         <p>Reinforcement learning builds strategy and defense</p>
       </div>
       <div class="pipeline-step">
-        <div class="dot">03</div>
+        <div class="circle">03</div>
         <h3>League</h3>
         <p>Ranked bouts. Top challenger earns a title shot</p>
       </div>
       <div class="pipeline-step">
-        <div class="dot">04</div>
+        <div class="circle">04</div>
         <h3>Evolution</h3>
         <p>Champions archived as opponents. League keeps improving</p>
       </div>
@@ -330,32 +363,32 @@
   <div class="section">
     <div class="section-eyebrow">The Rules</div>
     <h2>How combat works</h2>
-    <div class="rules-grid">
-      <div class="rule-item"><div class="key">Full Combat</div><div class="val">Punches, kicks, knees, elbows — all legal</div></div>
-      <div class="rule-item"><div class="key">Head Damage x2</div><div class="val">Head strikes deal double damage</div></div>
-      <div class="rule-item"><div class="key">Kick Damage x1.5</div><div class="val">More mass, more velocity, more damage</div></div>
-      <div class="rule-item"><div class="key">10-Point Must</div><div class="val">Three rounds, twenty seconds each</div></div>
-      <div class="rule-item"><div class="key">Draws</div><div class="val">Close rounds scored as draws — no coin flips</div></div>
-      <div class="rule-item"><div class="key">King Stays on Draw</div><div class="val">Beat the champion to take the crown</div></div>
+    <div class="rules">
+      <div class="rule"><div class="key">Full Combat</div><div class="val">Punches, kicks, knees, and elbows — all legal strikes</div></div>
+      <div class="rule"><div class="key">Head Damage x2</div><div class="val">Head strikes deal double damage — defense is critical</div></div>
+      <div class="rule"><div class="key">Kick Damage x1.5</div><div class="val">More mass and velocity means more damage per strike</div></div>
+      <div class="rule"><div class="key">10-Point Must</div><div class="val">Three rounds, twenty seconds each. KO, fall, or decision</div></div>
+      <div class="rule"><div class="key">Draws</div><div class="val">Close rounds are scored as draws — no coin flips</div></div>
+      <div class="rule"><div class="key">King Stays on Draw</div><div class="val">You must beat the champion to take the crown</div></div>
     </div>
-    </div>
+  </div>
 
   <!-- ENTER -->
   <div class="section">
     <div class="section-eyebrow">Participate</div>
     <h2>How to enter</h2>
-    <div class="enter-grid">
-      <div class="enter-card"><div class="num">01</div><div><h3>Fork the repo</h3><p>Clone FightLab from GitHub</p></div></div>
-      <div class="enter-card"><div class="num">02</div><div><h3>Train your fighter</h3><p>Run the training pipeline</p></div></div>
-      <div class="enter-card"><div class="num">03</div><div><h3>Test locally</h3><p>Run the deterministic evaluator</p></div></div>
-      <div class="enter-card"><div class="num">04</div><div><h3>Submit a PR</h3><p>Add your model and open a pull request</p></div></div>
-      <div class="enter-card"><div class="num">05</div><div><h3>Automated eval</h3><p>CI runs multi-seed evaluation in GitHub Actions</p></div></div>
-      <div class="enter-card"><div class="num">06</div><div><h3>Title bout</h3><p>Pass the gate, fight the king</p></div></div>
+    <div class="enter">
+      <div class="enter-card"><div class="step">01</div><div><h3>Fork the repository</h3><p>Clone FightLab from GitHub</p></div></div>
+      <div class="enter-card"><div class="step">02</div><div><h3>Train your fighter</h3><p>Run the training pipeline</p></div></div>
+      <div class="enter-card"><div class="step">03</div><div><h3>Test locally</h3><p>Run the deterministic evaluator</p></div></div>
+      <div class="enter-card"><div class="step">04</div><div><h3>Submit a pull request</h3><p>Add your model and open a PR</p></div></div>
+      <div class="enter-card"><div class="step">05</div><div><h3>Automated evaluation</h3><p>CI runs multi-seed evaluation in GitHub Actions</p></div></div>
+      <div class="enter-card"><div class="step">06</div><div><h3>Title bout</h3><p>Pass the gate and fight the king</p></div></div>
     </div>
   </div>
 
   <!-- CTA -->
-  <div class="cta-section">
+  <div class="cta">
     <div class="section-eyebrow">Get Started</div>
     <h2>Ready to fight?</h2>
     <p>Train a fighter. Submit a PR. Take the crown.</p>
@@ -366,8 +399,8 @@
   </div>
 
   <footer>
-    FightLab &middot; Autonomous Humanoid Combat League &middot;
-    <a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a>
+    <div>FightLab &middot; Autonomous Humanoid Combat League</div>
+    <div><a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a></div>
   </footer>
 
   <script>
