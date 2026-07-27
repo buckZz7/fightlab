@@ -78,6 +78,26 @@ class CombatEnv(G1FighterEnv):
         self._prev_act = np.zeros(ACT_DIM)
         self.native = HOME.copy()
 
+    def _place(self):
+        """Combat curriculum: randomize start distance.
+
+        Bots start 0.15-0.8m apart. Close starts ensure the bot
+        experiences landing hits from the start (no sparse reward).
+        Far starts teach it to close distance.
+        """
+        mujoco.mj_resetData(self.model, self.data)
+        gap = np.random.uniform(0.15, 0.8)
+        y_off = np.random.uniform(-0.1, 0.1)
+        for ai, (x, y) in enumerate([(-gap/2, y_off), (gap/2, -y_off)]):
+            off = ai * 36
+            self.data.qpos[off:off + 3] = [x, y, 0.793]
+            if ai == 0:
+                self.data.qpos[off + 3:off + 7] = [1, 0, 0, 0]
+            else:
+                self.data.qpos[off + 3:off + 7] = [0, 0, 0, 1]
+            self.data.qpos[off + 7:off + 36] = HOME
+        mujoco.mj_forward(self.model, self.data)
+
     def _load_ppo(self, path):
         if path is None:
             return None
@@ -183,17 +203,21 @@ class CombatEnv(G1FighterEnv):
         return self._get_obs(0), float(reward), terminated, truncated, info
 
     def _combat_reward(self, agent=0, action=None):
-        """Combat rewards: damage + face + approach + distance + survive."""
+        """Combat rewards: damage + face + approach + survive.
+
+        No distance penalty or shaping — the curriculum (close start)
+        ensures the bot experiences landing hits from the start.
+        The damage reward IS the incentive to approach."""
         opp = 1 - agent
         reward = 0.0
 
-        # Strike reward (hit) — BIG reward for landing damage
+        # Strike reward (hit) — THE primary incentive
         if (agent, opp) in self._contact_states:
             cs = self._contact_states[(agent, opp)]
             if not cs.get("shove", False):
                 reward += 200.0 * (cs.get("dmg", 0.0) / 8.0)
 
-        # Defensive penalty — getting hit hurts (head hits hurt more)
+        # Defensive penalty — getting hit hurts
         if self._dmg_taken[agent] > 0:
             reward -= 50.0 * (self._dmg_taken[agent] / 8.0)
 
@@ -208,19 +232,7 @@ class CombatEnv(G1FighterEnv):
         facing = np.dot(R[:, 0], face_dir)
         reward += 1.2 * np.exp(-max(0.0, 1.0 - facing) / 0.5)
 
-        # DISTANCE PENALTY — penalize being too far from opponent
-        # This creates urgency to close distance and fight
-        if dist > 0.8:
-            reward -= 2.0 * (dist - 0.8)  # linear penalty for distance
-        elif dist < 0.3:
-            reward += 0.5  # bonus for being in striking range
-
-        # Approach reward — stronger, rewards moving toward opponent
-        vel = self.data.cvel[self.pelvis_id[agent]][:3]
-        approach = max(0.0, np.dot(vel, face_dir))
-        reward += 5.0 * approach  # was 1.5
-
-        # Balance — HEAVY penalty for falling
+        # Balance — penalty for falling
         pelvis_z = self._pelvis_z(agent)
         reward -= 5.0 * max(0.0, 0.5 - pelvis_z)
         if pelvis_z > 0.7:
