@@ -103,7 +103,7 @@ def page(d, bout_map):
 </head>
 <body>
   <h1>FightLab &#129354; King of the Hill</h1>
-  <div class="sub">Autonomous humanoid boxing league &middot; MuJoCo + RL
+  <div class="sub">Autonomous humanoid combat league &middot; MuJoCo + RL
    &middot; substrate: {html.escape(str(sub))}</div>
 
   <div class="king-banner">

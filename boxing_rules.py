@@ -1,16 +1,15 @@
-"""Boxing rules engine for the FightLab King-of-the-Hill MVP.
+"""Combat rules engine for the FightLab King-of-the-Hill league.
 
 Defines the legal sport on top of the raw combat env:
-  - Legal targets: front torso + head only (no rear-head, no back)
-  - Legal weapons: fists only (no kicks, elbows, shoulders, shoves, clinches)
-  - Fouls: any non-fist contact, sustained clinch, rear-of-head contact
+  - Legal targets: torso + head (front and side)
+  - Legal weapons: fists, feet, knees, elbows (full combat)
   - Round structure: 3 rounds x ROUND_SECONDS, bell, rest between rounds
   - Scoring: 10-point must system (round winner gets 10, loser 9 or less)
     with deductions for fouls. HP/KO is a stoppage, not the only win path.
-  - Win conditions: KO/TKO (HP<=0 or knockdown), decision (after 3 rounds),
-    disqualification (foul points exceed limit).
+  - Win conditions: KO/TKO (HP<=0 or knockdown), decision (after 3 rounds).
 
-This is MVP-boxing-only. Kicks are excluded by rule (not just by architecture).
+Full combat: punches, kicks, spins all count. Any clean hit with
+sufficient relative velocity = damage.
 """
 import json
 import numpy as np

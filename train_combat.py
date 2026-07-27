@@ -1,4 +1,4 @@
-"""Combat Fine-Tuning: Stage 2 of the boxing pipeline.
+"""Combat Fine-Tuning: Stage 2 of the FightLab pipeline.
 
 Takes a trained motion tracker (Stage 1) and fine-tunes it with
 combat rewards in the 2-bot G1FighterEnv. The tracker provides
