@@ -1,45 +1,94 @@
 {
-  "king": "challenger_1.zip",
+  "king": "fighter_v4.zip",
   "standings": [
     {
-      "name": "challenger_1.zip",
-      "elo": 1500.0,
-      "W": 0,
-      "L": 0,
+      "name": "fighter_v4.zip",
+      "elo": 1554.7,
+      "W": 7,
+      "L": 2,
+      "D": 6
+    },
+    {
+      "name": "scripted:pd",
+      "elo": 1506.9,
+      "W": 2,
+      "L": 1,
       "D": 12
     },
     {
       "name": "scripted:jabbler",
-      "elo": 1500.0,
+      "elo": 1495.4,
       "W": 0,
       "L": 0,
+      "D": 15
+    },
+    {
+      "name": "fighter_v2.zip",
+      "elo": 1495.0,
+      "W": 0,
+      "L": 0,
+      "D": 15
+    },
+    {
+      "name": "scripted:balanced",
+      "elo": 1474.5,
+      "W": 0,
+      "L": 3,
       "D": 12
     },
     {
       "name": "scripted:defender",
-      "elo": 1500.0,
+      "elo": 1473.4,
       "W": 0,
-      "L": 0,
-      "D": 12
-    },
-    {
-      "name": "scripted:balanced",
-      "elo": 1500.0,
-      "W": 0,
-      "L": 0,
-      "D": 12
-    },
-    {
-      "name": "scripted:pd",
-      "elo": 1500.0,
-      "W": 0,
-      "L": 0,
+      "L": 3,
       "D": 12
     }
   ],
   "results": [
     {
-      "red": "challenger_1.zip",
+      "red": "fighter_v4.zip",
+      "blue": "fighter_v2.zip",
+      "bout": 1,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1500.0,
+      "elo_blue": 1500.0
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "fighter_v2.zip",
+      "bout": 2,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1500.0,
+      "elo_blue": 1500.0
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "fighter_v2.zip",
+      "bout": 3,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1500.0,
+      "elo_blue": 1500.0
+    },
+    {
+      "red": "fighter_v4.zip",
       "blue": "scripted:jabbler",
       "bout": 1,
       "winner": null,
@@ -53,7 +102,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "challenger_1.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:jabbler",
       "bout": 2,
       "winner": null,
@@ -67,7 +116,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "challenger_1.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:jabbler",
       "bout": 3,
       "winner": null,
@@ -81,8 +130,134 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "challenger_1.zip",
+      "red": "fighter_v4.zip",
       "blue": "scripted:defender",
+      "bout": 1,
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
+      "hp": [
+        90.01624395790436,
+        98.67645016139119
+      ],
+      "rounds": 2,
+      "elo_red": 1516.0,
+      "elo_blue": 1484.0
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:defender",
+      "bout": 2,
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
+      "hp": [
+        90.01624395790436,
+        98.67645016139119
+      ],
+      "rounds": 2,
+      "elo_red": 1530.5,
+      "elo_blue": 1469.5
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:defender",
+      "bout": 3,
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
+      "hp": [
+        90.01624395790436,
+        98.67645016139119
+      ],
+      "rounds": 2,
+      "elo_red": 1543.7,
+      "elo_blue": 1456.3
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:balanced",
+      "bout": 1,
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
+      "hp": [
+        94.79370375614737,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1557.7,
+      "elo_blue": 1486.0
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:balanced",
+      "bout": 2,
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
+      "hp": [
+        94.79370375614737,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1570.5,
+      "elo_blue": 1473.3
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:balanced",
+      "bout": 3,
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
+      "hp": [
+        94.79370375614737,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1582.1,
+      "elo_blue": 1461.6
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:pd",
+      "bout": 1,
+      "winner": "fighter_v4.zip",
+      "method": "DECISION",
+      "hp": [
+        95.177957460029,
+        98.58264754929468
+      ],
+      "rounds": 2,
+      "elo_red": 1594.4,
+      "elo_blue": 1487.7
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:pd",
+      "bout": 2,
+      "winner": "scripted:pd",
+      "method": "KO",
+      "hp": [
+        0.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1573.6,
+      "elo_blue": 1508.5
+    },
+    {
+      "red": "fighter_v4.zip",
+      "blue": "scripted:pd",
+      "bout": 3,
+      "winner": "scripted:pd",
+      "method": "KO",
+      "hp": [
+        0,
+        99.35245110441427
+      ],
+      "rounds": 2,
+      "elo_red": 1554.7,
+      "elo_blue": 1527.4
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:jabbler",
       "bout": 1,
       "winner": null,
       "method": "DRAW",
@@ -95,8 +270,8 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "challenger_1.zip",
-      "blue": "scripted:defender",
+      "red": "fighter_v2.zip",
+      "blue": "scripted:jabbler",
       "bout": 2,
       "winner": null,
       "method": "DRAW",
@@ -109,8 +284,8 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "challenger_1.zip",
-      "blue": "scripted:defender",
+      "red": "fighter_v2.zip",
+      "blue": "scripted:jabbler",
       "bout": 3,
       "winner": null,
       "method": "DRAW",
@@ -123,91 +298,7 @@
       "elo_blue": 1500.0
     },
     {
-      "red": "challenger_1.zip",
-      "blue": "scripted:balanced",
-      "bout": 1,
-      "winner": null,
-      "method": "DRAW",
-      "hp": [
-        100.0,
-        100.0
-      ],
-      "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
-    },
-    {
-      "red": "challenger_1.zip",
-      "blue": "scripted:balanced",
-      "bout": 2,
-      "winner": null,
-      "method": "DRAW",
-      "hp": [
-        100.0,
-        100.0
-      ],
-      "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
-    },
-    {
-      "red": "challenger_1.zip",
-      "blue": "scripted:balanced",
-      "bout": 3,
-      "winner": null,
-      "method": "DRAW",
-      "hp": [
-        100.0,
-        100.0
-      ],
-      "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
-    },
-    {
-      "red": "challenger_1.zip",
-      "blue": "scripted:pd",
-      "bout": 1,
-      "winner": null,
-      "method": "DRAW",
-      "hp": [
-        100.0,
-        100.0
-      ],
-      "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
-    },
-    {
-      "red": "challenger_1.zip",
-      "blue": "scripted:pd",
-      "bout": 2,
-      "winner": null,
-      "method": "DRAW",
-      "hp": [
-        100.0,
-        100.0
-      ],
-      "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
-    },
-    {
-      "red": "challenger_1.zip",
-      "blue": "scripted:pd",
-      "bout": 3,
-      "winner": null,
-      "method": "DRAW",
-      "hp": [
-        100.0,
-        100.0
-      ],
-      "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
-    },
-    {
-      "red": "scripted:jabbler",
+      "red": "fighter_v2.zip",
       "blue": "scripted:defender",
       "bout": 1,
       "winner": null,
@@ -217,8 +308,134 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1498.0,
+      "elo_blue": 1458.3
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:defender",
+      "bout": 2,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1496.2,
+      "elo_blue": 1460.1
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:defender",
+      "bout": 3,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1494.5,
+      "elo_blue": 1461.7
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:balanced",
+      "bout": 1,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1493.0,
+      "elo_blue": 1463.1
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:balanced",
+      "bout": 2,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1491.6,
+      "elo_blue": 1464.5
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:balanced",
+      "bout": 3,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1490.4,
+      "elo_blue": 1465.8
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:pd",
+      "bout": 1,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1492.1,
+      "elo_blue": 1525.7
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:pd",
+      "bout": 2,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1493.6,
+      "elo_blue": 1524.2
+    },
+    {
+      "red": "fighter_v2.zip",
+      "blue": "scripted:pd",
+      "bout": 3,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1495.0,
+      "elo_blue": 1522.8
+    },
+    {
+      "red": "scripted:jabbler",
+      "blue": "scripted:defender",
+      "bout": 1,
+      "winner": null,
+      "method": "DRAW",
+      "hp": [
+        100.0,
+        100.0
+      ],
+      "rounds": 2,
+      "elo_red": 1498.2,
+      "elo_blue": 1463.5
     },
     {
       "red": "scripted:jabbler",
@@ -231,8 +448,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1496.6,
+      "elo_blue": 1465.1
     },
     {
       "red": "scripted:jabbler",
@@ -245,8 +462,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1495.2,
+      "elo_blue": 1466.5
     },
     {
       "red": "scripted:jabbler",
@@ -259,8 +476,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1493.8,
+      "elo_blue": 1467.1
     },
     {
       "red": "scripted:jabbler",
@@ -273,8 +490,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1492.6,
+      "elo_blue": 1468.3
     },
     {
       "red": "scripted:jabbler",
@@ -287,8 +504,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1491.5,
+      "elo_blue": 1469.5
     },
     {
       "red": "scripted:jabbler",
@@ -301,8 +518,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1492.9,
+      "elo_blue": 1521.4
     },
     {
       "red": "scripted:jabbler",
@@ -315,8 +532,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1494.2,
+      "elo_blue": 1520.1
     },
     {
       "red": "scripted:jabbler",
@@ -329,8 +546,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1495.4,
+      "elo_blue": 1518.9
     },
     {
       "red": "scripted:defender",
@@ -343,8 +560,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1466.7,
+      "elo_blue": 1469.3
     },
     {
       "red": "scripted:defender",
@@ -357,8 +574,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1466.8,
+      "elo_blue": 1469.2
     },
     {
       "red": "scripted:defender",
@@ -371,8 +588,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1466.9,
+      "elo_blue": 1469.1
     },
     {
       "red": "scripted:defender",
@@ -385,8 +602,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1469.3,
+      "elo_blue": 1516.5
     },
     {
       "red": "scripted:defender",
@@ -399,8 +616,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1471.4,
+      "elo_blue": 1514.3
     },
     {
       "red": "scripted:defender",
@@ -413,8 +630,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1473.4,
+      "elo_blue": 1512.4
     },
     {
       "red": "scripted:balanced",
@@ -427,8 +644,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1471.1,
+      "elo_blue": 1510.4
     },
     {
       "red": "scripted:balanced",
@@ -441,8 +658,8 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1472.9,
+      "elo_blue": 1508.6
     },
     {
       "red": "scripted:balanced",
@@ -455,10 +672,10 @@
         100.0
       ],
       "rounds": 2,
-      "elo_red": 1500.0,
-      "elo_blue": 1500.0
+      "elo_red": 1474.5,
+      "elo_blue": 1506.9
     }
   ],
   "substrate": "PD",
-  "generated_utc": "2026-07-27T11:56:16.323308Z"
+  "generated_utc": "2026-07-27T12:46:52.212124Z"
 }
