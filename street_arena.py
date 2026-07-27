@@ -127,4 +127,44 @@ def build_default_2bot():
     model.opt.tolerance = 1e-4
     model.opt.iterations = 50
     model.opt.integrator = mujoco.mjtIntegrator.mjINT_RK4
+
+    # Enable collision on target bodies (torso, head, shoulders, elbows)
+    # + weapon bodies (wrists, ankles) + foot bodies. The G1's mesh geoms
+    # have collision disabled by default — we re-enable it for combat.
+    COMBAT_BODIES = set()
+    for pfx in ("r1_", "r2_"):
+        for nm in ["torso_link", "head_link",
+                   "left_shoulder_pitch_link", "right_shoulder_pitch_link",
+                   "left_elbow_link", "right_elbow_link",
+                   "left_wrist_yaw_link", "right_wrist_yaw_link",
+                   "left_ankle_pitch_link", "left_ankle_roll_link",
+                   "right_ankle_pitch_link", "right_ankle_roll_link"]:
+            bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"{pfx}{nm}")
+            if bid >= 0:
+                COMBAT_BODIES.add(bid)
+
+    for i in range(model.ngeom):
+        bid = model.geom_bodyid[i]
+        if bid in COMBAT_BODIES:
+            model.geom_contype[i] = 1
+            model.geom_conaffinity[i] = 1
+            # For wrist geoms: increase collision margin so punches register
+            bname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, bid) or ""
+            if "wrist_yaw_link" in bname:
+                model.geom_solref[i] = [0.01, 1.0]
+                model.geom_solimp[i] = [0.5, 0.9, 0.001, 0.5, 2.0]
+                # Use a larger margin for collision detection
+                model.geom_margin[i] = 0.02  # 2cm contact margin
+
+    # Firm contacts for foot planting
+    model.opt.impratio = 20.0
+    for i in range(model.ngeom):
+        bname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, model.geom_bodyid[i]) or ""
+        is_floor = model.geom_type[i] == mujoco.mjtGeom.mjGEOM_PLANE
+        is_foot = bname.endswith(("ankle_pitch_link", "ankle_roll_link"))
+        if is_floor or is_foot:
+            model.geom_solref[i] = [0.008, 1.0]
+            model.geom_solimp[i] = [0.9, 0.95, 0.002, 0.5, 2.0]
+            model.geom_condim[i] = 4
+
     return model

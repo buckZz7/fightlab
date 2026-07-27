@@ -114,8 +114,18 @@ class G1FighterEnv(gym.Env):
         self.pelvis_id = []
         self.fist_geoms = []
         self.torso_bodies = []
-        TORSO = ["torso_link", "head_link", "left_shoulder_pitch_link",
-                  "right_shoulder_pitch_link", "left_elbow_link", "right_elbow_link"]
+        TORSO = ["torso_link", "head_link",
+                 "left_shoulder_pitch_link", "right_shoulder_pitch_link",
+                 "left_shoulder_roll_link", "right_shoulder_roll_link",
+                 "left_shoulder_yaw_link", "right_shoulder_yaw_link",
+                 "left_elbow_link", "right_elbow_link",
+                 "left_wrist_roll_link", "right_wrist_roll_link",
+                 "left_wrist_pitch_link", "right_wrist_pitch_link",
+                 "left_wrist_yaw_link", "right_wrist_yaw_link",
+                 "waist_yaw_link", "waist_roll_link",
+                 "left_hip_pitch_link", "right_hip_pitch_link",
+                 "left_hip_roll_link", "right_hip_roll_link",
+                 "left_hip_yaw_link", "right_hip_yaw_link"]
         for i, pfx in enumerate(["r1_", "r2_"]):
             self.pelvis_id.append(self.model.body(f"{pfx}pelvis").id)
             # Weapons = WRIST collision geoms (punches) + ANKLE collision geoms (kicks)
