@@ -201,8 +201,11 @@ class G1FighterEnv(gym.Env):
 
     def _apply_control(self, agent_tau, agent_ctrl_slice):
         """Apply PD torque with sim2real noise: torque noise + 1-step delay."""
-        noise = np.random.normal(0.0, self.torque_noise_std, agent_tau.shape)
-        tau = agent_tau + noise
+        if self.torque_noise_std > 0:
+            noise = np.random.normal(0.0, self.torque_noise_std, agent_tau.shape)
+            tau = agent_tau + noise
+        else:
+            tau = agent_tau  # deterministic: no noise when std=0
         # 1-step actuator delay (ring buffer): command lags 1 control step
         if not hasattr(self, "_delay_buf"):
             self._delay_buf = {}

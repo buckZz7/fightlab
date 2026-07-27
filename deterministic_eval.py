@@ -44,8 +44,10 @@ def run_bout(fighter_path, opponent_spec, seed=42):
     """Run a single deterministic bout. Returns bout log."""
     env = G1FighterEnv(max_steps=EVAL_STEPS, randomize=False)
 
-    # Force deterministic: no randomization, fixed seed
+    # Force full determinism: seed everything, no randomization
     np.random.seed(seed)
+    import random as pyrandom
+    pyrandom.seed(seed)
 
     obs, _ = env.reset(seed=seed)
     judge = CombatJudge(env, round_seconds=ROUND_SECONDS, rounds=ROUNDS)
