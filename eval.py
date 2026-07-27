@@ -424,7 +424,15 @@ def egl_bout_main(argv=None):
     a = ap.parse_args(argv)
 
     env = G1FighterEnv(max_steps=a.steps, randomize=False, demo=(a.p1 is None))
+    # Start close — within striking range so the fight is visible
     obs, _ = env.reset()
+    env.data.qpos[0:3] = [-0.15, 0, 0.793]
+    env.data.qpos[36:39] = [0.15, 0, 0.793]
+    env.data.qpos[3:7] = [1, 0, 0, 0]
+    env.data.qpos[39:43] = [0, 0, 0, 1]
+    import mujoco as _mj
+    _mj.mj_forward(env.model, env.data)
+    obs = env._get_obs(0)
     judge = CombatJudge(env, round_seconds=3.0, rounds=3)
 
     if a.p1:
