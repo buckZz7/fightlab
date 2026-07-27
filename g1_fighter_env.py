@@ -26,8 +26,8 @@ from street_arena import build_default_2bot
 from loco_base29 import StandPD, KP, KD, HOME
 from g1_moves_reward import MoveCoach
 
-DT = 0.002   # MUST match g1_arena.DT (RK4 stable timestep). 0.01 sagged.
-FRAME_SKIP = 1   # control every physics step (500Hz). Mirrors g1_balance_env.
+DT = 0.002   # RK4 stable timestep
+FRAME_SKIP = 1   # control every physics step (500Hz)
 N_SKILL = 14
 N_CMD = 3
 ACT_DIM = N_SKILL + N_CMD
@@ -56,12 +56,12 @@ class G1FighterEnv(gym.Env):
         # Never set by training (fighters learn small residuals).
         self.demo = demo
         # king: which robot (0 or 1) is the reigning king -> RED gloves.
-        # None -> default r1=red, r2=blue (legacy left/right).
+        # None -> default r1=red, r2=blue.
         self.king = king
         # No glove coloring (bare-handed street fight).
 
         # Capture fighters use HOME as the balance base (NOT self.native).
-        # The balance policy is TRAINED relative to HOME (g1_balance_env:
+        # The balance policy is TRAINED relative to HOME (same reference pose).
         # target = HOME + act*SCALE_BAL, obs jrel = qp - HOME). The frozen
         # policy must receive the exact same obs encoding + target base or
         # it falls. self.native (XML default) != HOME -> mismatch.

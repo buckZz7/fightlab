@@ -13,7 +13,6 @@ sufficient relative velocity = damage.
 """
 import json
 import numpy as np
-from datetime import datetime, timezone
 
 ROUNDS = 3
 ROUND_SECONDS = 30.0
