@@ -23,19 +23,36 @@ Autonomous humanoid combat league — Unitree G1 robots learn to fight via RL in
 
 ## How to Enter
 
-1. Fork this repo
+1. Fork this repo (includes walker, env, eval pipeline, and all past kings' weights)
 2. Train your fighter:
-   ```bash
-   python3 train_motion_tracker.py --steps 2000000 --out models/my_tracker
-   python3 train_combat.py --tracker models/my_tracker.zip --steps 1000000 --out models/my_fighter
-   ```
-3. Test locally:
-   ```bash
-   python3 eval.py deterministic_eval --fighter models/my_fighter.zip
-   ```
-4. Submit a PR adding `models/my_fighter.zip`
+   - **From scratch**: train against a sandbag or scripted opponent
+   - **Fine-tune a king**: load a past king's weights and improve on top
+   - **Train against a king**: use the current king as your sparring partner
+3. Test locally with the deterministic eval
+4. Submit a PR adding your `models/*.zip`
 5. CI auto-runs trustless eval (deterministic, multi-seed, auditable)
-6. If you pass the gate (≥1 win, ≥1 damage, won on ≥2 seeds) → title bout vs king
+6. If you pass the gate (win on 2+ seeds, deal damage) → title bout vs king
+
+## Open Weights Policy
+
+All kings' weights are published in `models/kings/`. Anyone can:
+- Download and study them
+- Fine-tune them as a starting point
+- Use them as training opponents
+- The gate prevents copying: you must BEAT the king to take the crown, not match it.
+
+## What's Open Source
+
+- The G1 model + scene (MuJoCo physics)
+- The walker (pretrained balance — shared infrastructure)
+- The scoring engine (damage detection, 10-point must)
+- The eval pipeline (deterministic, multi-seed, hashed, auditable)
+- The league system (ELO, king of the hill, evolution loop)
+- All past kings' weights
+
+## What Miners Provide
+
+Their trained model weights (`models/*.zip`). That's it. One file.
 
 ## Trustless Eval
 
