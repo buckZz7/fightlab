@@ -183,22 +183,22 @@ class CombatEnv(G1FighterEnv):
         return self._get_obs(0), float(reward), terminated, truncated, info
 
     def _combat_reward(self, agent=0, action=None):
-        """Combat rewards: hit + face + approach + survive."""
+        """Combat rewards: damage + face + approach + survive. Hard fall penalty."""
         opp = 1 - agent
         reward = 0.0
 
-        # Strike reward (hit)
+        # Strike reward (hit) — BIG reward for landing damage
         if (agent, opp) in self._contact_states:
             cs = self._contact_states[(agent, opp)]
             if not cs.get("shove", False):
-                reward += 50.0 * (cs.get("dmg", 0.0) / 8.0)
+                reward += 100.0 * (cs.get("dmg", 0.0) / 8.0)
 
-        # Defensive penalty
+        # Defensive penalty — getting hit hurts
         if self._dmg_taken[agent] > 0:
-            reward -= 8.0 * (self._dmg_taken[agent] / 8.0)
+            reward -= 30.0 * (self._dmg_taken[agent] / 8.0)
 
         # Delta striking force
-        reward += 0.3 * (self._dmg_dealt[agent] - self._dmg_taken[agent])
+        reward += 1.0 * (self._dmg_dealt[agent] - self._dmg_taken[agent])
 
         # Facing alignment
         R = self._quat_to_rot(self.data.qpos[3:7])
@@ -208,14 +208,18 @@ class CombatEnv(G1FighterEnv):
         facing = np.dot(R[:, 0], face_dir)
         reward += 1.2 * np.exp(-max(0.0, 1.0 - facing) / 0.5)
 
-        # Approach reward
+        # Approach reward — only when in striking range
         vel = self.data.cvel[self.pelvis_id[agent]][:3]
         approach = max(0.0, np.dot(vel, face_dir))
         in_range = np.exp(-abs(dist - 0.5) / 1.0)
         reward += 1.5 * (1.0 if approach > 0.8 else 0.0) * in_range
 
-        # Balance penalty
-        reward -= 0.05 * max(0.0, 0.4 - self._pelvis_z(agent))
+        # Balance — HEAVY penalty for falling (the main fix)
+        pelvis_z = self._pelvis_z(agent)
+        reward -= 5.0 * max(0.0, 0.5 - pelvis_z)
+        # Bonus for staying upright
+        if pelvis_z > 0.7:
+            reward += 0.5
 
         # Action smoothness
         if hasattr(self, "_prev_act"):
@@ -247,6 +251,11 @@ def make_env(tracker_path, opponent_path, max_steps, seed):
     def _init():
         env = CombatEnv(tracker_path=tracker_path, opponent_path=opponent_path,
                        max_steps=max_steps, randomize=True)
+        # If no opponent model, use a ShadowBoxer (moves + punches) instead of
+        # the default PD sandbag (just stands there = no learning signal).
+        if opponent_path is None:
+            from bout_fighter import ShadowBoxer
+            env.opponent = ShadowBoxer(env, style="blue")
         env.reset(seed=seed)
         return env
     return _init
@@ -255,11 +264,11 @@ def make_env(tracker_path, opponent_path, max_steps, seed):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tracker", required=True, help="motion tracker model path")
-    ap.add_argument("--opponent", default=None, help="opponent fighter (None=PD stand)")
+    ap.add_argument("--opponent", default=None, help="opponent fighter (None=ShadowBoxer)")
     ap.add_argument("--steps", type=int, default=1000000)
     ap.add_argument("--out", default="models/fighter_v2")
     ap.add_argument("--envs", type=int, default=16)
-    ap.add_argument("--max-steps", type=int, default=1500)
+    ap.add_argument("--max-steps", type=int, default=1500, help="short bouts for early learning")
     a = ap.parse_args()
 
     env = SubprocVecEnv([make_env(a.tracker, a.opponent, a.max_steps, i)

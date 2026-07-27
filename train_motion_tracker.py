@@ -160,11 +160,19 @@ class MotionTrackerEnv(gym.Env):
         body_err = np.mean((cur_pelvis - ref_pelvis) ** 2)
         body_reward = np.exp(-5.0 * body_err)
 
-        # Stay upright
+        # Stay upright — HEAVY penalty for falling
         pelvis_z = self.data.xpos[pelvis_id][2]
-        upright_reward = 1.0 if pelvis_z > 0.5 else -1.0
+        upright_reward = 2.0 * np.exp(-50.0 * max(0.0, 0.793 - pelvis_z))
 
-        reward = 0.3 * joint_reward + 0.2 * vel_reward + 0.3 * body_reward + 0.2 * upright_reward
+        # Foot contact reward (both feet on ground = stable)
+        foot_contact = 0
+        for side in ("left", "right"):
+            fb = self.model.body(f"r1_{side}_ankle_roll_link").id
+            if self.data.xpos[fb][2] < 0.1:
+                foot_contact += 1
+        foot_reward = 0.1 * foot_contact
+
+        reward = 0.25 * joint_reward + 0.15 * vel_reward + 0.2 * body_reward + 0.3 * upright_reward + 0.1 * foot_reward
 
         # Penalize falling
         terminated = pelvis_z < 0.3
