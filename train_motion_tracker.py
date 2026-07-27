@@ -71,6 +71,8 @@ class MotionTrackerEnv(gym.Env):
 
         # Home pose (from the model's default qpos)
         self.home = self.data.qpos[self.qpos_off + 7:self.qpos_off + 36].copy()
+        self._base_mass = self.model.body_mass.copy()
+        self._base_friction = self.model.geom_friction.copy()
 
         # Action: target joint position deltas (29 DoF)
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(N_DOFS,), dtype=np.float32)
@@ -83,6 +85,7 @@ class MotionTrackerEnv(gym.Env):
         self.step_count = 0
         self.motion = None
         self.motion_t = 0
+        self._rng = np.random.RandomState()
 
     def _get_obs(self):
         """Current joint state + reference target."""
@@ -94,11 +97,16 @@ class MotionTrackerEnv(gym.Env):
         ref_vel = self.motion["joint_vel"][t]
         return np.concatenate([qp - self.home, qv, ref_pos - self.home, ref_vel]).astype(np.float32)
 
+    def _randomize(self):
+        """Domain randomization for sim2real robustness."""
+        self.model.body_mass[:] = self._base_mass * self._rng.uniform(0.9, 1.1, self.model.nbody)
+        self.model.geom_friction[:, 0] = self._base_friction[:, 0] * self._rng.uniform(0.85, 1.15, self.model.ngeom)
+
     def reset(self, seed=None, options=None):
         mujoco.mj_resetData(self.model, self.data)
         # Pick a random motion
         self.motion = random.choice(self.motions)
-        # Pick a random start time within the motion
+        # Pick a random start time within the motion (reference state init)
         T = len(self.motion["joint_pos"])
         self.motion_t = random.randint(0, max(0, T - 100))
 
@@ -106,6 +114,11 @@ class MotionTrackerEnv(gym.Env):
         self.data.qpos[self.qpos_off:self.qpos_off + 3] = [0, 0, 0.793]
         self.data.qpos[self.qpos_off + 3:self.qpos_off + 7] = [1, 0, 0, 0]
         self.data.qpos[self.qpos_off + 7:self.qpos_off + 36] = self.motion["joint_pos"][self.motion_t]
+
+        # Domain randomization
+        if self.randomize:
+            self._randomize()
+
         mujoco.mj_forward(self.model, self.data)
 
         self.step_count = 0
@@ -126,19 +139,24 @@ class MotionTrackerEnv(gym.Env):
         self.step_count += 1
         self.motion_t = min(self.motion_t + 1, len(self.motion["joint_pos"]) - 1)
 
-        # Reward: joint position tracking + body position tracking
+        # Reward: joint position tracking + joint velocity tracking + body + upright
         t = self.motion_t
         ref_pos = self.motion["joint_pos"][t]
+        ref_vel = self.motion["joint_vel"][t]
         cur_pos = self.data.qpos[self.qpos_off + 7:self.qpos_off + 36]
+        cur_vel = self.data.qvel[self.qvel_off + 6:self.qvel_off + 35]
 
         joint_err = np.mean((cur_pos - ref_pos) ** 2)
         joint_reward = np.exp(-10.0 * joint_err)
 
-        # Body position tracking (pelvis + key links)
+        vel_err = np.mean((cur_vel - ref_vel) ** 2)
+        vel_reward = np.exp(-2.0 * vel_err)
+
+        # Body position tracking (pelvis)
         ref_body = self.motion["body_pos"][t]
         pelvis_id = self.model.body("r1_pelvis").id
         cur_pelvis = self.data.xpos[pelvis_id]
-        ref_pelvis = ref_body[0]  # pelvis is body 0
+        ref_pelvis = ref_body[0]
         body_err = np.mean((cur_pelvis - ref_pelvis) ** 2)
         body_reward = np.exp(-5.0 * body_err)
 
@@ -146,7 +164,7 @@ class MotionTrackerEnv(gym.Env):
         pelvis_z = self.data.xpos[pelvis_id][2]
         upright_reward = 1.0 if pelvis_z > 0.5 else -1.0
 
-        reward = 0.5 * joint_reward + 0.3 * body_reward + 0.2 * upright_reward
+        reward = 0.3 * joint_reward + 0.2 * vel_reward + 0.3 * body_reward + 0.2 * upright_reward
 
         # Penalize falling
         terminated = pelvis_z < 0.3
