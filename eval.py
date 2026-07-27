@@ -416,6 +416,7 @@ def egl_bout_main(argv=None):
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--p1", default=None, help="fighter policy path (None=shadowboxer)")
+    ap.add_argument("--p2", default=None, help="opponent: scripted:PROFILE or model path (default=jabbler)")
     ap.add_argument("--steps", type=int, default=5000)
     ap.add_argument("--out", default="/tmp/egl_bout.mp4")
     ap.add_argument("--no-terminate", action="store_true")
@@ -432,7 +433,14 @@ def egl_bout_main(argv=None):
     else:
         p1 = ShadowBoxer(env, style="red")
 
-    env.opponent = ShadowBoxer(env, style="blue")
+    # Opponent: specified profile, model, or default jabbler (aggressive)
+    if a.p2 and a.p2.startswith("scripted:"):
+        env.opponent = ShadowBoxer(env, style="blue", profile=a.p2.split(":")[1])
+    elif a.p2 and os.path.exists(a.p2):
+        from stable_baselines3 import PPO
+        env.opponent = PPO.load(a.p2)
+    else:
+        env.opponent = ShadowBoxer(env, style="blue", profile="jabbler")
 
     cam_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_CAMERA, "broadcast")
     r = mujoco.Renderer(env.model, height=720, width=1280)
