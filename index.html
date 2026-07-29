@@ -394,6 +394,12 @@ section { padding: 110px 40px; }
   text-underline-offset: 3px; margin-left: 12px; letter-spacing: 0.05em;
 }
 .policy-link:hover { color: var(--text); }
+.baseline-tag {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  color: var(--text-faint); border: 1px solid var(--border-bright);
+  padding: 2px 7px; margin-left: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; vertical-align: 3px;
+}
 @media (max-width: 800px) { .bouts-grid { grid-template-columns: 1fr; } }
 
 /* ---------- rules strip ---------- */
@@ -587,18 +593,26 @@ footer {
       <div class="st-row st-head">
         <div>#</div><div>Fighter</div><div>ELO</div><div>Record</div><div>Streak</div><div>Bouts</div>
       </div>
-      <div class="st-row is-king">
+      <div class="st-row">
         <div class="st-rank">1</div>
+        <div class="st-name">Sandbag<span class="baseline-tag">baseline</span></div>
+        <div class="st-elo">1014</div>
+        <div class="st-record">3–2–0</div>
+        <div class="st-streak win">W1</div>
+        <div class="st-bouts">5</div>
+      </div>
+      <div class="st-row is-king">
+        <div class="st-rank">2</div>
         <div class="st-name">V3 Striker<span class="crown">CHAMP</span>
           <a class="policy-link" href="https://github.com/buckZz7/fightlab/tree/main/submissions/fightlab-v3" target="_blank" rel="noopener">weights</a></div>
-        <div class="st-elo">1000</div>
-        <div class="st-record">0–0–0</div>
-        <div class="st-streak">—</div>
-        <div class="st-bouts">0</div>
+        <div class="st-elo">986</div>
+        <div class="st-record">2–3–0</div>
+        <div class="st-streak loss">L1</div>
+        <div class="st-bouts">5</div>
       </div>
       <div class="st-row">
-        <div class="st-rank">2</div>
-        <div class="st-name">V4 (in training)</div>
+        <div class="st-rank">3</div>
+        <div class="st-name">V6 (in training)</div>
         <div class="st-elo">—</div>
         <div class="st-record">—</div>
         <div class="st-streak">—</div>
@@ -606,7 +620,7 @@ footer {
       </div>
     </div>
     <p style="margin-top:18px;color:var(--text-faint);font-size:13px">
-      Calibration bots (Sandbag) are not ranked. Title fights are five-seed, referee-signed series; records update after each sanctioned event.
+      ELO is live from the league ledger (K=32, start 1000). The Sandbag is a league-owned calibration baseline — eligible to fight, not eligible for the belt. Title fights are five-seed, referee-signed series.
     </p>
   </div>
 </section>
