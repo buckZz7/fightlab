@@ -155,6 +155,26 @@ winner's `damage_dealt` across all seeds in the bout.
 A bout can end in one of four outcomes, determined per seed and then
 aggregated (Section 7).
 
+> **Implementation note (v5, 2026-07-29).** The current referee
+> (`engine/contract_bout_runner.py`) implements a simplified form of this
+> section:
+>
+> - **No referee stand-ups and no count.** A fallen fighter (pelvis below
+>   0.4 m) is not reset; they remain on the ground until they get up under
+>   their own power or the seed ends at the step cap. A fall is NOT
+>   automatically a KO.
+> - **KO** = HP reduced to zero by legal strikes. **Double KO** (both at
+>   zero) is a draw.
+> - **Decision** at the step cap: (1) HP margin >= 5 decides; otherwise
+>   (2) ground-time margin >= 3 seconds decides (fighter who spent less
+>   time below 0.4 m wins); otherwise the seed is a draw.
+> - Strikes by or against a downed fighter do not score (the attacker must
+>   be upright, pelvis > 0.5 m, and the strike must exceed 1 m/s of
+>   arm-swing velocity toward the opponent's torso).
+>
+> The subsections below describe the target ruleset (count, ring-out,
+> fouls) toward which the referee is evolving.
+
 ### 5.1 Knockout (KO)
 
 A knockout occurs when a fighter's body falls (the torso or pelvis drops

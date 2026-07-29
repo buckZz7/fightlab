@@ -201,9 +201,12 @@ class _Robot:
 class ContractBoutRunner:
     """Real BoutRunner over the contract scene (docs/policy-contract.md)."""
 
-    def __init__(self, scene_xml: str = _SCENE, verbose: bool = False):
+    def __init__(self, scene_xml: str = _SCENE, verbose: bool = False,
+                 record_path: Optional[str] = None, record_fps: int = 30):
         self.scene_xml = scene_xml
         self.verbose = verbose
+        self.record_path = record_path
+        self.record_fps = record_fps
 
     def run_bout(
         self,
@@ -283,14 +286,24 @@ class ContractBoutRunner:
         policy_a = load_policy(policy_a_path)
         policy_b = load_policy(policy_b_path)
 
+        # Optional video recording (fixed broadcast camera).
+        renderer = None
+        writer = None
+        if self.record_path:
+            import imageio
+            renderer = mujoco.Renderer(model, height=540, width=960)
+            writer = imageio.get_writer(self.record_path, fps=self.record_fps, codec="libx264")
+
         hp_a, hp_b = 100.0, 100.0
         dmg_a_total = 0.0  # damage A deals to B
         dmg_b_total = 0.0
         steps_a_upright = 0
         steps_b_upright = 0
+        ground_a = 0  # steps spent below fall threshold (ground time)
+        ground_b = 0
         score_a = 0.0
         terminated = False
-        settle_steps = 0  # grace period after (re)spawn: no damage scored
+        settle_steps = 0  # grace period after spawn: no damage scored
 
         for step in range(max_steps):
             mujoco.mj_forward(model, data)
@@ -307,6 +320,10 @@ class ContractBoutRunner:
 
             for _ in range(DECIM):
                 mujoco.mj_step(model, data)
+
+            if writer is not None:
+                renderer.update_scene(data, camera=-1)
+                writer.append_data(renderer.render())
 
             # --- Damage: wrist-torso contact gated by punch velocity projected
             # TOWARD the opponent (matches training hit detection). Skipped for
@@ -345,26 +362,22 @@ class ContractBoutRunner:
                         dmg_b_total += dmg
 
             za, zb = A.pelvis_z(data), B.pelvis_z(data)
-            if za >= FALL_Z:
+            a_down = za < FALL_Z
+            b_down = zb < FALL_Z
+            if not a_down:
                 steps_a_upright += 1
-            if zb >= FALL_Z:
+            else:
+                ground_a += 1
+            if not b_down:
                 steps_b_upright += 1
+            else:
+                ground_b += 1
 
-            # --- Ref stand-up (knockdown-reset-continue) ---
-            if za < FALL_Z or zb < FALL_Z or hp_a <= KO_HP or hp_b <= KO_HP:
-                # KO check first: if either HP is gone the bout ends.
-                if hp_a <= KO_HP or hp_b <= KO_HP:
-                    terminated = True
-                    break
-                # Fall = knockdown: stand BOTH back up, bout continues.
-                for rb, sign, quat in ((A, -1, (1.0, 0, 0, 0)), (B, +1, (0.0, 0, 0, 1.0))):
-                    data.qpos[rb.qpos_adr:rb.qpos_adr + 3] = [sign * SEPARATION / 2, 0.0, SPAWN_Z]
-                    data.qpos[rb.qpos_adr + 3:rb.qpos_adr + 7] = quat
-                    data.qvel[:] = 0.0
-                    data.qpos[rb.ctrl_qpos] = DEFAULT_POSE_23
-                    data.qpos[rb.wrist_qpos] = 0.0
-                mujoco.mj_forward(model, data)
-                settle_steps = 0
+            # v5: no ref stand-ups. A downed robot stays down until it gets up
+            # itself or the bout ends. Bout ends only on KO (HP -> 0).
+            if hp_a <= KO_HP or hp_b <= KO_HP:
+                terminated = True
+                break
 
             if self.verbose and step % 100 == 0:
                 sys.stderr.write(
@@ -372,7 +385,9 @@ class ContractBoutRunner:
                     f"dmg_a={dmg_a_total:.1f} dmg_b={dmg_b_total:.1f}\n"
                 )
 
-        # --- Winner ---
+        # --- Winner (v5 ruleset) ---
+        # KO: opponent HP to zero. Decision at the cap: (1) HP margin >= 5,
+        # (2) ground-time margin >= 90 steps (3 s), else draw.
         a_out = hp_a <= KO_HP
         b_out = hp_b <= KO_HP
         if a_out and not b_out:
@@ -380,10 +395,17 @@ class ContractBoutRunner:
         elif b_out and not a_out:
             winner = "A"
         elif a_out and b_out:
-            winner = None
+            winner = None  # double KO = draw
         else:
-            margin = hp_a - hp_b
-            winner = None if abs(margin) < 5.0 else ("A" if margin > 0 else "B")
+            hp_margin = hp_a - hp_b
+            if abs(hp_margin) >= 5.0:
+                winner = "A" if hp_margin > 0 else "B"
+            else:
+                gt_margin = ground_b - ground_a  # positive = A spent less time down
+                if abs(gt_margin) >= 90:
+                    winner = "A" if gt_margin > 0 else "B"
+                else:
+                    winner = None
 
         score_b = dmg_b_total
 
@@ -403,6 +425,9 @@ class ContractBoutRunner:
                 f"[bout] seed={seed} winner={winner} hp=[{hp_a:.0f},{hp_b:.0f}] "
                 f"dmg_a={result.damage_dealt_a} dmg_b={result.damage_dealt_b}\n"
             )
+        if writer is not None:
+            writer.close()
+            renderer.close()
         return result
 
 
