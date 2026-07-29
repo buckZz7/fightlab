@@ -8,3 +8,4 @@ __pycache__/
 # BUT the league page needs its bout videos
 !docs/bouts/*.mp4
 !assets/fights/*.mp4
+!assets/fights/**/*.mp4
