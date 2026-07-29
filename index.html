@@ -384,6 +384,7 @@ section { padding: 110px 40px; }
 .bout-result { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
 .bout-result.win { color: var(--green); }
 .bout-result.loss { color: var(--red); }
+.bout-result.draw { color: var(--text-dim); }
 .bout-stats { display: flex; flex-direction: column; gap: 6px; }
 .bout-stats > div { display: flex; justify-content: space-between; font-size: 13px; }
 .bout-stats .k { color: var(--text-faint); text-transform: uppercase; font-size: 11px; letter-spacing: 0.08em; }
@@ -593,21 +594,21 @@ footer {
       <div class="st-row st-head">
         <div>#</div><div>Fighter</div><div>ELO</div><div>Record</div><div>Streak</div><div>Bouts</div>
       </div>
-      <div class="st-row">
-        <div class="st-rank">1</div>
-        <div class="st-name">Sandbag<span class="baseline-tag">baseline</span></div>
-        <div class="st-elo">1014</div>
-        <div class="st-record">3–2–0</div>
-        <div class="st-streak win">W1</div>
-        <div class="st-bouts">5</div>
-      </div>
       <div class="st-row is-king">
-        <div class="st-rank">2</div>
+        <div class="st-rank">1</div>
         <div class="st-name">V3 Striker<span class="crown">CHAMP</span>
           <a class="policy-link" href="https://github.com/buckZz7/fightlab/tree/main/submissions/fightlab-v3" target="_blank" rel="noopener">weights</a></div>
-        <div class="st-elo">986</div>
-        <div class="st-record">2–3–0</div>
+        <div class="st-elo">1011</div>
+        <div class="st-record">2–1–2</div>
         <div class="st-streak loss">L1</div>
+        <div class="st-bouts">5</div>
+      </div>
+      <div class="st-row">
+        <div class="st-rank">2</div>
+        <div class="st-name">Sandbag<span class="baseline-tag">baseline</span></div>
+        <div class="st-elo">990</div>
+        <div class="st-record">1–2–2</div>
+        <div class="st-streak win">W1</div>
         <div class="st-bouts">5</div>
       </div>
       <div class="st-row">
@@ -643,8 +644,8 @@ footer {
         <div class="corner-sub"><a href="https://github.com/buckZz7/fightlab/tree/main/submissions/fightlab-v3" target="_blank" rel="noopener">Open policy bundle</a></div>
       </div>
       <div class="series-score">
-        <div class="score-num">2<span>–</span>3</div>
-        <div class="score-lbl">Series result</div>
+        <div class="score-num">2<span>–</span>2<span>–</span>1</div>
+        <div class="score-lbl">Series result (W–L–D)</div>
       </div>
       <div class="corner blue">
         <div class="corner-tag">Blue corner — Challenger</div>
@@ -662,10 +663,10 @@ footer {
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 1</span><span class="bout-seed">seed 1</span></div>
-          <div class="bout-result loss">Sandbag wins — KO</div>
+          <div class="bout-result draw">Draw</div>
           <div class="bout-stats">
-            <div><span class="k">Damage</span><span class="v">99.7 – 100.3</span></div>
-            <div><span class="k">Deciding factor</span><span class="v">Striker went down in the final exchange</span></div>
+            <div><span class="k">Damage</span><span class="v">36.3 – 39.3</span></div>
+            <div><span class="k">Deciding factor</span><span class="v">Both down, no finisher — HP margin &lt; 5</span></div>
           </div>
         </div>
       </div>
@@ -677,10 +678,10 @@ footer {
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 2</span><span class="bout-seed">seed 2</span></div>
-          <div class="bout-result win">V3 Striker wins — KO</div>
+          <div class="bout-result win">V3 Striker wins — decision</div>
           <div class="bout-stats">
-            <div><span class="k">Damage</span><span class="v">104.3 – 92.0</span></div>
-            <div><span class="k">Deciding factor</span><span class="v">Sustained upright pressure, Sandbag KO'd</span></div>
+            <div><span class="k">Damage</span><span class="v">35.6 – 15.4</span></div>
+            <div><span class="k">Deciding factor</span><span class="v">Out-struck the Sandbag 2-to-1, HP margin</span></div>
           </div>
         </div>
       </div>
@@ -692,10 +693,10 @@ footer {
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 3</span><span class="bout-seed">seed 3</span></div>
-          <div class="bout-result loss">Sandbag wins — KO</div>
+          <div class="bout-result draw">Draw</div>
           <div class="bout-stats">
-            <div><span class="k">Damage</span><span class="v">95.0 – 106.6</span></div>
-            <div><span class="k">Deciding factor</span><span class="v">Striker collapsed mid-exchange</span></div>
+            <div><span class="k">Damage</span><span class="v">31.7 – 36.6</span></div>
+            <div><span class="k">Deciding factor</span><span class="v">Scrappy exchange, both ended on the floor</span></div>
           </div>
         </div>
       </div>
@@ -707,10 +708,10 @@ footer {
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 4</span><span class="bout-seed">seed 4</span></div>
-          <div class="bout-result win">V3 Striker wins — KO</div>
+          <div class="bout-result win">V3 Striker wins — decision</div>
           <div class="bout-stats">
-            <div><span class="k">Damage</span><span class="v">104.4 – 42.8</span></div>
-            <div><span class="k">Deciding factor</span><span class="v">Dominant — Sandbag never landed clean</span></div>
+            <div><span class="k">Damage</span><span class="v">77.9 – 31.1</span></div>
+            <div><span class="k">Deciding factor</span><span class="v">Best bout of the series — dominant striking</span></div>
           </div>
         </div>
       </div>
@@ -722,10 +723,10 @@ footer {
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 5</span><span class="bout-seed">seed 5</span></div>
-          <div class="bout-result loss">Sandbag wins — KO</div>
+          <div class="bout-result loss">Sandbag wins — decision</div>
           <div class="bout-stats">
-            <div><span class="k">Damage</span><span class="v">49.9 – 100.4</span></div>
-            <div><span class="k">Deciding factor</span><span class="v">Striker's worst bout — early fall, never recovered</span></div>
+            <div><span class="k">Damage</span><span class="v">12.8 – 58.8</span></div>
+            <div><span class="k">Deciding factor</span><span class="v">Striker's worst bout — fell early, out-damaged</span></div>
           </div>
         </div>
       </div>
@@ -733,8 +734,8 @@ footer {
 
     <div class="signed-strip">
       <span class="hash-lbl">Signed payload</span>
-      <code>fe5b0b50ceb71a91…</code>
-      <span class="hash-note">SHA-256 over the full five-seed result — verify with <code>engine/eval_harness.py</code></span>
+      <code>b0e135c62edd3eb0…</code>
+      <span class="hash-note">SHA-256 over the full five-seed result (v5 ruleset, no stand-ups) — verify with <code>engine/eval_harness.py</code></span>
     </div>
   </div>
 </section>
