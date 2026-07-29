@@ -17,27 +17,39 @@ submit any policy that conforms to the submission protocol.
 
 All sanctioned bouts are governed by this ruleset. Any bout executed by the
 `EvalHarness` with a conforming `BoutConfig` is, by definition, a sanctioned
-bout, and its signed result is binding on league standings and ELO.
+bout, and its signed result is binding on the league record.
 
 Where this ruleset and the implementation disagree, this ruleset is
 authoritative; the implementation is to be corrected.
+
+> **League structure note (2026-07-29).** FightLab is a king-of-the-hill
+> league, not a ratings league. There is no ELO. The record consists of:
+> (1) **reigns** — who holds the belt and for how long; (2) **title
+> fights** — champion vs challenger, decided by sanctioned series;
+> (3) **submission decisions** — the signed evaluation result for every
+> submitted policy. A challenger fights the reigning champion directly
+> until past kings exist; thereafter challengers must defeat recent
+> former kings (the gauntlet) before earning a title shot. A drawn
+> series means the champion keeps the belt.
 
 ---
 
 ## 2. Definitions
 
 - **Fighter.** A submitted policy and its associated weights. Each fighter has
-  a miner-chosen name, a policy file, and an ELO rating.
+  a miner-chosen name and a policy bundle.
 - **Bout.** A single competitive engagement between two fighters, consisting
   of one or more seeds.
 - **Seed.** A single deterministic simulation run of a bout, identified by an
   integer seed that initializes all stochastic elements (initial pose noise,
   contact perturbations, referee coin-flips).
-- **Policy.** A file containing a fighter's weights, submitted for
-  evaluation. Must be a single file not exceeding the size cap.
+- **Policy.** A bundle containing a fighter's weights and loader, submitted
+  for evaluation. Must conform to docs/policy-contract.md and the size cap.
 - **Referee.** The `EvalHarness` — the trustless component that runs seeds,
   aggregates results, applies the damage gate, and signs bout results.
-- **King.** The highest-rated fighter in the league at the time of a crown.
+- **King.** The fighter currently holding the belt. The belt changes hands
+  only when a challenger wins a sanctioned title-fight series; a draw means
+  the champion retains.
 - **UTC.** All timestamps are Coordinated Universal Time, ISO-8601 with a `Z`
   suffix (e.g. `2026-07-27T14:33:01.123456Z`).
 

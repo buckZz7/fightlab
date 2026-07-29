@@ -1,0 +1,54 @@
+{
+  "format": "fightlab-league=2",
+  "note": "King-of-the-hill ledger: reigns, title fights, submissions. No ELO.",
+  "current_king": "V3 Striker",
+  "reigns": [
+    {
+      "king": "V3 Striker",
+      "crowned_at": "2026-07-29T00:00:00Z",
+      "ended_at": null,
+      "defenses": 0,
+      "note": "First champion. Crowned as the league's initial trained fighter."
+    }
+  ],
+  "title_fights": [
+    {
+      "event": "FightLab 01",
+      "date": "2026-07-29",
+      "champion": "V3 Striker",
+      "challenger": "Sandbag",
+      "ruleset": "v5 (no stand-ups)",
+      "result": "2-2-1 draw",
+      "champion_keeps": true,
+      "payload_sha256": "b0e135c62edd3eb0",
+      "videos": [
+        "assets/fights/fl01/seed1.mp4",
+        "assets/fights/fl01/seed2.mp4",
+        "assets/fights/fl01/seed3.mp4",
+        "assets/fights/fl01/seed4.mp4",
+        "assets/fights/fl01/seed5.mp4"
+      ],
+      "seed_results": [
+        {"seed": 1, "outcome": "draw", "damage": "36.3-39.3"},
+        {"seed": 2, "outcome": "champion", "damage": "35.6-15.4"},
+        {"seed": 3, "outcome": "draw", "damage": "31.7-36.6"},
+        {"seed": 4, "outcome": "champion", "damage": "77.9-31.1"},
+        {"seed": 5, "outcome": "challenger", "damage": "12.8-58.8"}
+      ]
+    }
+  ],
+  "submissions": [
+    {
+      "name": "V3 Striker",
+      "policy": "submissions/fightlab-v3",
+      "status": "king",
+      "submitted_at": "2026-07-29"
+    },
+    {
+      "name": "Sandbag",
+      "policy": "sandbag",
+      "status": "baseline",
+      "submitted_at": "2026-07-29"
+    }
+  ]
+}

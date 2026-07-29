@@ -16,36 +16,36 @@ interface miners conform to, see
 ## Pipeline
 
 ```
-train                submit         eval              league         crown          render
-  |                    |              |                 |              |              |
-  v                    v              v                 v              v              v
-miner trains a        miner_sdk.py   engine/           league.py      league.py      render_bout.py
-policy (v2: Isaac     submit         eval_harness.py   records the    crown          (GPU pod, not
-Lab, 3-stage track    validates +    runs the bout,    bout,          archives       bundled here)
--> distill -> fight)  registers      signs the         updates ELO    king weights
-                                     result            and W/L/D      + metadata
+train                submit         eval              record          crown          render
+  |                    |              |                 |               |              |
+  v                    v              v                 v               v              v
+miner trains a        miner_sdk.py   engine/           league.py       league.py      render (pod)
+policy (any stack)    submit         eval_harness.py   records the     archives       (not bundled)
+                      validates +    runs the series,  title fight,    king weights
+                      registers      signs the         updates the     + metadata
+                                     result           reign ledger
 ```
 
-1. **Train.** A miner trains a policy using the v2 pipeline (see
-   [docs/v2-pipeline.md](v2-pipeline.md)): DeepMimic tracking (Isaac
-   Lab) → latent distillation → warmup → self-play. The v1 interface
-   (41D obs / 17D action, walker-based) is deprecated. The v2
-   interface uses a 32-D latent action space over 23-DoF PD targets.
-2. **Submit.** `miner_sdk.py submit` validates the policy file (exists,
+1. **Train.** A miner trains a policy using any stack (see
+   [docs/v2-pipeline.md](v2-pipeline.md) for the reference recipe). The
+   contract is docs/policy-contract.md (`fightlab-contract=2`, 73D obs /
+   29D joint targets).
+2. **Submit.** `miner_sdk.py submit` validates the policy bundle (exists,
    under size cap, hashes cleanly) and registers the fighter in the
    league.
-3. **Eval.** `engine/eval_harness.py` runs a multi-seed bout (default 5
+3. **Eval.** `engine/eval_harness.py` runs a multi-seed series (default 5
    seeds), applies the damage gate, aggregates results, and produces a
    signed result JSON (SHA-256 payload hash + optional HMAC). Any third
-   party can recompute the hash and replay the bout with the same seed
-   and env pin.
-4. **League.** `league.py` records the bout, updates both fighters' ELO
-   (K=32, start 1000) and W/L/D records. State persists to
-   `league_state.json` (atomic writes).
-5. **Crown.** `league.py crown` archives the top-ELO fighter's open
+   party can recompute the hash (`miner_sdk.py verify result.json`) and
+   replay the bout with the same seed and env pin.
+4. **Record.** `league.py` records the outcome in the reign ledger
+   (`league_state.json`, format `fightlab-league=2`): reigns, title
+   fights, submission decisions. There is no ELO — the belt is the only
+   ranking.
+5. **Crown.** `league.py crown` archives the reigning king's open
    weights and metadata to `kings/<fighter-slug>/`.
-6. **Render.** `render_bout.py` (on the GPU pod, not bundled here)
-   renders a bout video from a signed result for promotion and review.
+6. **Render.** Bout videos are rendered from signed results for
+   promotion and review (on the GPU pod, not bundled here).
 
 ---
 
@@ -53,7 +53,7 @@ Lab, 3-stage track    validates +    runs the bout,    bout,          archives  
 
 | File                          | Role                                                                 |
 |-------------------------------|----------------------------------------------------------------------|
-| `league.py`                   | ELO league, round-robin scheduler, king archiving (CLI + library). Root entry point. |
+| `league.py`                   | King-of-the-hill ledger: reigns, title fights, submissions, king archiving (CLI + library). Root entry point. |
 | `miner_sdk.py`                | Miner entry point: submit, evaluate, check status (CLI + library). Root entry point. |
 | `engine/eval_harness.py`      | Trustless referee: multi-seed bouts, signed results, damage gate. Maintainer-owned. |
 | `engine/real_bout_runner.py`  | Bridges the eval harness to MuJoCo (`G1FighterEnv`). Maintainer-owned. |
@@ -83,7 +83,7 @@ JSON state files are the single source of truth. Each is written
 atomically (temp file + `os.replace`) to prevent corruption on crash.
 
 ```
-league_state.json        League state: fighters, ELO, bout records, king archive index.
+league_state.json        Reign ledger (fightlab-league=2): reigns, title fights, submission decisions.
   ^                      Written by league.py. Read by miner_sdk.py and web/.
   |
   +-- league.py (record_bout, crown)

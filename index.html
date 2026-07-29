@@ -412,6 +412,39 @@ section { padding: 110px 40px; }
 .rule-v { font-size: 13px; color: var(--text-dim); }
 @media (max-width: 900px) { .rules-strip { grid-template-columns: 1fr 1fr; } }
 
+/* ---------- reign list & gauntlet ---------- */
+.reign-list { margin-top: 50px; display: flex; flex-direction: column; gap: 16px; }
+.reign {
+  display: flex; gap: 24px; align-items: center;
+  border: 1px solid var(--border); background: var(--bg-raised);
+  padding: 26px 32px;
+}
+.reign.current { border-color: rgba(212,169,78,0.5); }
+.reign-belt {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.15em; color: var(--gold);
+}
+.reign-belt svg { width: 20px; height: 20px; fill: var(--gold); }
+.reign-name { font-size: 22px; font-weight: 900; text-transform: uppercase; }
+.reign-meta { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+.gauntlet-box {
+  margin-top: 36px; border: 1px solid var(--border); background: var(--bg);
+  padding: 30px 34px;
+}
+.gauntlet-title {
+  font-size: 18px; font-weight: 800; text-transform: uppercase; margin-bottom: 20px;
+}
+.gauntlet-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 32px; }
+.g-step { display: flex; gap: 14px; align-items: flex-start; color: var(--text-dim); font-size: 14px; }
+.g-step strong { color: var(--text); }
+.g-n {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--red);
+  border: 1px solid rgba(229,50,45,0.4); width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+@media (max-width: 800px) { .gauntlet-steps { grid-template-columns: 1fr; } }
+
 /* ---------- signed strip ---------- */
 .signed-strip {
   margin-top: 26px; padding: 18px 26px;
@@ -468,7 +501,7 @@ footer {
   <a class="nav-logo" href="#top"><span class="mark"></span>FightLab</a>
   <div class="nav-links">
     <a href="#league">The League</a>
-    <a href="#standings">Standings</a>
+    <a href="#standings">The Record</a>
     <a href="#fights">Fights</a>
     <a class="nav-cta" href="https://github.com/buckZz7/fightlab" target="_blank" rel="noopener">Enter the League</a>
   </div>
@@ -580,41 +613,33 @@ footer {
 
 <section id="standings" style="padding-top:0">
   <div class="section-inner">
-    <div class="section-tag">Rankings</div>
-    <h2 class="section-title">Standings</h2>
-    <div class="standings-table">
-      <div class="st-row st-head">
-        <div>#</div><div>Fighter</div><div>ELO</div><div>Record</div><div>Streak</div><div>Bouts</div>
-      </div>
-      <div class="st-row is-king">
-        <div class="st-rank">1</div>
-        <div class="st-name">V3 Striker<span class="crown">CHAMP</span>
-          <a class="policy-link" href="https://github.com/buckZz7/fightlab/tree/main/submissions/fightlab-v3" target="_blank" rel="noopener">weights</a></div>
-        <div class="st-elo">1011</div>
-        <div class="st-record">2–1–2</div>
-        <div class="st-streak loss">L1</div>
-        <div class="st-bouts">5</div>
-      </div>
-      <div class="st-row">
-        <div class="st-rank">2</div>
-        <div class="st-name">Sandbag<span class="baseline-tag">baseline</span></div>
-        <div class="st-elo">990</div>
-        <div class="st-record">1–2–2</div>
-        <div class="st-streak win">W1</div>
-        <div class="st-bouts">5</div>
-      </div>
-      <div class="st-row">
-        <div class="st-rank">3</div>
-        <div class="st-name">V6 (in training)</div>
-        <div class="st-elo">—</div>
-        <div class="st-record">—</div>
-        <div class="st-streak">—</div>
-        <div class="st-bouts">—</div>
+    <div class="section-tag">The Record</div>
+    <h2 class="section-title">Title history</h2>
+    <p class="section-lede">Every reign, every title fight, decided on the record. No points systems — the belt is the only ranking that matters.</p>
+    <div class="reign-list">
+      <div class="reign current">
+        <div class="reign-belt">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7v2c0 5.5 3.8 10.7 10 13 6.2-2.3 10-7.5 10-13V7L12 2z"/></svg>
+          REIGNING
+        </div>
+        <div class="reign-main">
+          <div class="reign-name">V3 Striker
+            <a class="policy-link" href="https://github.com/buckZz7/fightlab/tree/main/submissions/fightlab-v3" target="_blank" rel="noopener">weights</a>
+          </div>
+          <div class="reign-meta">Crowned July 2026 — inaugural champion · 0 defenses · survives FightLab 01 (draw, keeps belt)</div>
+        </div>
       </div>
     </div>
-    <p style="margin-top:18px;color:var(--text-faint);font-size:13px">
-      ELO is live from the league ledger (K=32, start 1000). The Sandbag is a league-owned calibration baseline — eligible to fight, not eligible for the belt. Title fights are five-seed, referee-signed series.
-    </p>
+
+    <div class="gauntlet-box">
+      <div class="gauntlet-title">The path to the belt</div>
+      <div class="gauntlet-steps">
+        <div class="g-step"><span class="g-n">1</span><div><strong>Submit</strong> — open a PR with your policy bundle against the open contract.</div></div>
+        <div class="g-step"><span class="g-n">2</span><div><strong>Evaluation</strong> — the referee runs your fighter through a signed assessment series. The decision goes on the record.</div></div>
+        <div class="g-step"><span class="g-n">3</span><div><strong>Title fight</strong> — pass evaluation, fight the champion in a five-seed signed series. Win, take the belt. Draw, champion keeps it.</div></div>
+        <div class="g-step"><span class="g-n">4</span><div><strong>The gauntlet</strong> — once the league has past kings, challengers must beat recent former champions before earning a title shot.</div></div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -757,7 +782,7 @@ footer {
     <div class="footer-links">
       <a href="https://github.com/buckZz7/fightlab" target="_blank" rel="noopener">GitHub</a>
       <a href="#league">Rules</a>
-      <a href="#standings">Standings</a>
+      <a href="#standings">The Record</a>
     </div>
   </div>
 </footer>
