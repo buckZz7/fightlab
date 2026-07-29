@@ -586,31 +586,57 @@ def _cmd_challenge(args: argparse.Namespace) -> int:
 
 def _cmd_info(args: argparse.Namespace) -> int:
     """Print the environment interface documentation."""
-    print("FightLab Environment Interface")
+    print("FightLab Environment Interface (fightlab-contract=2)")
     print("=" * 60)
     print()
-    print(f"Observation space: {OBS_DIM}D (continuous)")
-    print(f"Action space:      {ACT_DIM}D (continuous, approx [-1, 1])")
+    print("Observation space: 73D (continuous)")
+    print("Action space:      29D joint position targets (rad)")
     print()
-    print("Action layout (17D):")
-    print("  [0:3]   velocity commands (vx, vy, yaw_rate)")
-    print("  [3:10]  left arm joint targets (7 DOF)")
-    print("  [10:17] right arm joint targets (7 DOF)")
+    print("Observation layout (73D):")
+    print("  [0:3]   root angular velocity, body frame")
+    print("  [3:32]  joint positions relative to guard pose (29, JOINT_NAMES_29)")
+    print("  [32:61] joint velocities (29)")
+    print("  [61:67] opponent torso minus ego fists, ego frame (3+3)")
+    print("  [67:73] opponent pelvis minus ego torso, ego frame (3+3)")
     print()
-    print("Observation layout (41D):")
-    print("  [0:3]   root linear velocity (x, y, z), body frame")
-    print("  [3:6]   root angular velocity (roll, pitch, yaw), body frame")
-    print("  [6:9]   projected gravity (3-axis tilt)")
-    print("  [9:23]  arm joint positions (14: 7 left + 7 right), radians")
-    print("  [23:37] arm joint velocities (14: 7 left + 7 right), rad/s")
-    print("  [37:39] opponent relative position (x, y), arena frame")
-    print("  [39:41] opponent relative heading (cos, sin of bearing)")
+    print("Action layout (29D): joint position targets, JOINT_NAMES_29 order")
+    print("  legs 0-11, waist 12-14, left arm 15-21, right arm 22-28")
+    print("  (shoulder pitch/roll/yaw, elbow, wrist roll/pitch/yaw per arm)")
     print()
-    print("Balance: maintained by walker.onnx (not controlled by policy).")  # v1 only; v2 uses latent space
-    print("Scene:   scene_2bot.xml (two Unitree G1 humanoids).")
-    print()
-    print("Note: verify per-index semantics against local fight_env.py.")
+    print("Scene: engine/assets/scene_2bot_mjlab.xml (two Unitree G1, 29-DoF,")
+    print("       position actuators, implicitfast solver, 120 Hz physics / 30 Hz policy)")
+    print("Docs:  docs/policy-contract.md (authoritative)")
     return 0
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    """Verify a signed bout result's integrity (payload hash + optional HMAC)."""
+    import json as _json
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "engine"))
+    try:
+        from eval_harness import EvalHarness
+    except Exception as e:  # pragma: no cover
+        print(f"verify: could not import eval_harness: {e}")
+        return 2
+
+    with open(args.result_json) as f:
+        raw = f.read()
+    try:
+        ok = EvalHarness.verify(raw)
+    except Exception as e:
+        print(f"INVALID: {e}")
+        return 1
+    d = _json.loads(raw)
+    print("Result integrity: VALID")
+    print(f"  bout_id:        {d.get('bout_id')}")
+    print(f"  payload_sha256: {d.get('payload_sha256', '')[:16]}...")
+    agg = d.get("aggregate", {})
+    print(f"  overall winner: {agg.get('overall_winner')}")
+    print(f"  seeds:          {len(d.get('seed_results', []))}")
+    if d.get("hmac_sha256"):
+        print("  note: result is HMAC-signed; hash verified, signature not checked (no key).")
+    return 0 if ok else 1
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -660,6 +686,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     # info
     sp = sub.add_parser("info", help="Print the environment interface documentation.")
     sp.set_defaults(func=_cmd_info)
+
+    # verify
+    sp = sub.add_parser(
+        "verify",
+        help="Verify a signed bout result: recompute the payload hash and check integrity.",
+    )
+    sp.add_argument("result_json", help="Path to a signed bout result JSON file.")
+    sp.set_defaults(func=_cmd_verify)
 
     return p
 

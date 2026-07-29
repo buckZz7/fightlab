@@ -1,9 +1,8 @@
 # docs/policy-contract.md — FightLab Policy & Bout Contract
 
-**Version:** 1.0
+**Version:** 2.0
 **Last updated:** 2026-07-29T00:00:00Z
-**Status:** authoritative for new submissions. Supersedes the v1 (85D/17D)
-`G1FighterEnv` interface, which is deprecated.
+**Status:** authoritative for new submissions. Supersedes v1 (61D/23D).
 
 This document defines the ONLY things a miner must conform to for their
 policy to fight in the league. FightLab is deliberately training-stack
@@ -11,12 +10,17 @@ agnostic: miners may train in Isaac Lab, mjlab, Genesis, or their own
 stack. The league cares only about what arrives at the bout — a black box
 that maps a standard observation to standard joint position targets.
 
+**v2 changes (29-DoF):** action space grows from 23 to 29 joint targets
+(wrists are now controlled, enabling palm-plant get-ups, blocks, and
+open-hand work); observation grows from 61 to 73 dims (wrist pos/vel
+added). v1 bundles are deprecated; `fightlab-contract=2` is required.
+
 ---
 
 ## 1. The contract in one sentence
 
-> Given the standard 61-D observation from the standard two-robot MuJoCo
-> scene, at 30 Hz, return a 23-D vector of joint position targets.
+> Given the standard 73-D observation from the standard two-robot MuJoCo
+> scene, at 30 Hz, return a 29-D vector of joint position targets.
 
 Everything else — how you trained, what architecture you use, whether a
 latent decoder lives inside your bundle — is your business.
@@ -48,7 +52,7 @@ The scene file is hashed alongside the policy bundle for reproducibility.
 
 ## 3. Observation contract (61-D)
 
-`obs = concat(ang_vel_body[3], joint_pos_rel[23], joint_vel[23], goal[12])`
+`obs = concat(ang_vel_body[3], joint_pos_rel[29], joint_vel[29], goal[12])`
 
 All quantities are for the observing robot ("ego") and expressed in the
 ego root (pelvis) body frame unless noted.
@@ -56,10 +60,10 @@ ego root (pelvis) body frame unless noted.
 | Slice | Field | Dim | Definition |
 |-------|-------|-----|------------|
 | 0:3   | `ang_vel_body` | 3 | Root angular velocity, body frame (rad/s). |
-| 3:26  | `joint_pos_rel` | 23 | Controlled joint positions minus the default guard pose (rad), in `JOINT_NAMES_23` order (Appendix B). |
-| 26:49 | `joint_vel` | 23 | Controlled joint velocities (rad/s), same order. |
-| 49:55 | `goal_offense` | 6 | Opponent torso position minus ego left/right fist position, in ego frame (3+3, m). |
-| 55:61 | `goal_defense` | 6 | Opponent pelvis position minus ego torso position, in ego frame (3+3, m). |
+| 3:32  | `joint_pos_rel` | 29 | Controlled joint positions minus the default guard pose (rad), in `JOINT_NAMES_29` order (Appendix B). |
+| 32:61 | `joint_vel` | 29 | Controlled joint velocities (rad/s), same order. |
+| 61:67 | `goal_offense` | 6 | Opponent torso position minus ego left/right fist position, in ego frame (3+3, m). |
+| 67:73 | `goal_defense` | 6 | Opponent pelvis position minus ego torso position, in ego frame (3+3, m). |
 
 - Fists are the `left/right_wrist_pitch_link` bodies. Torso is
   `torso_link`. Pelvis is the root body.
@@ -68,12 +72,13 @@ ego root (pelvis) body frame unless noted.
 - Both robots receive the same structured observation from their own
   perspective (roles mirrored).
 
-## 4. Action contract (23-D)
+## 4. Action contract (29-D)
 
-`action = 23-D vector of joint position targets (rad), in JOINT_NAMES_23 order.`
+`action = 29-D vector of joint position targets (rad), in JOINT_NAMES_29 order.`
 
-- The env applies these directly to the position actuators. The 6 wrist
-  joints are held at 0 and are not part of the action.
+- The env applies these directly to the position actuators. All 29
+  joints are controlled, including the 6 wrist joints (roll/pitch/yaw
+  per hand).
 - Targets are clamped to the joint's soft position limits.
 - There is no action filtering, smoothing, or torque computation inside
   the env — the position actuators handle PD implicitly. Miners who want
@@ -82,14 +87,14 @@ ego root (pelvis) body frame unless noted.
 
 ### Default guard pose
 
-Both robots spawn at this pose (rad, `JOINT_NAMES_23` order):
+Both robots spawn at this pose (rad, `JOINT_NAMES_29` order; wrists at 0):
 
 ```
 [-0.20, 0.0, 0.0, 0.50, -0.30, 0.0,   # left leg
  -0.20, 0.0, 0.0, 0.50, -0.30, 0.0,   # right leg
   0.0,   0.0, 0.0,                    # waist
-  0.20,  0.20, 0.0, 0.90,             # left arm (guard)
-  0.20, -0.20, 0.0, 0.90]             # right arm (guard)
+  0.20,  0.20, 0.0, 0.90, 0.0, 0.0, 0.0,   # left arm (guard) + wrist
+  0.20, -0.20, 0.0, 0.90, 0.0, 0.0, 0.0]   # right arm (guard) + wrist
 ```
 
 `joint_pos_rel` in the observation is relative to this pose.
@@ -112,10 +117,10 @@ A submission is a directory:
 ```python
 class Policy:
     def predict(self, obs: np.ndarray) -> np.ndarray:
-        """obs: (61,) float32. Returns (23,) joint position targets (rad)."""
+        """obs: (73,) float32. Returns (29,) joint position targets (rad)."""
 ```
 
-The contract version is `fightlab-contract=1`. The harness validates the
+The contract version is `fightlab-contract=2`. The harness validates the
 interface, hashes the weights, and pins the scene/obs/action versions
 into the signed result.
 
@@ -157,7 +162,7 @@ into the signed result.
 | shoulder_*, elbow, wrist_roll | 14.251 | 0.907 | 25 | 0.00361 |
 | wrist_pitch, wrist_yaw | 16.778 | 1.068 | 5 | 0.00361 |
 
-## Appendix B — JOINT_NAMES_23 order
+## Appendix B — JOINT_NAMES_29 order
 
 ```
 left_hip_pitch, left_hip_roll, left_hip_yaw, left_knee,
@@ -166,7 +171,9 @@ right_hip_pitch, right_hip_roll, right_hip_yaw, right_knee,
 right_ankle_pitch, right_ankle_roll,
 waist_yaw, waist_roll, waist_pitch,
 left_shoulder_pitch, left_shoulder_roll, left_shoulder_yaw, left_elbow,
-right_shoulder_pitch, right_shoulder_roll, right_shoulder_yaw, right_elbow
+left_wrist_roll, left_wrist_pitch, left_wrist_yaw,
+right_shoulder_pitch, right_shoulder_roll, right_shoulder_yaw, right_elbow,
+right_wrist_roll, right_wrist_pitch, right_wrist_yaw
 ```
 
-(All suffixed `_joint` in the scene.)
+(All suffixed `_joint` in the scene. Order matches the mjlab G1 XML.)

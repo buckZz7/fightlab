@@ -248,7 +248,10 @@ class ContractBoutRunner:
         np.random.seed(seed)
         _pyrandom.seed(seed)
 
-        model = mujoco.MjModel.from_xml_path(self.scene_xml)
+        model = mujoco.MjModel.from_xml_path(
+            os.path.join(_HERE, "assets", "scene_2bot_broadcast.xml")
+            if self.record_path else self.scene_xml
+        )
         model.opt.timestep = 1.0 / 120.0
         data = mujoco.MjData(model)
 
