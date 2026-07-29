@@ -1,554 +1,607 @@
-"""King-of-the-hill league: round-robin bouts + ELO standings,
-page generation, auto-update, and bout rendering.
+#!/usr/bin/env python3
+"""FightLab league system.
 
-This file consolidates (preserving all functionality):
-  - league.py             : round-robin bouts + ELO scoring
-  - gen_league_page.py    : league standings HTML page (docs/index.html)
-  - league_update.py      : auto-update (run league + render + page) cron entry
-  - render_league_bouts.py: render league bouts to MP4s (EGL + tracking cam)
+A self-contained ELO league for autonomous humanoid combat (Unitree G1).
 
-Entrant types (in --entrants):
-  models/fighter_v1        -> trained PPO policy (red loads it)
-  scripted:jabbler         -> scripted aggressive ShadowBoxer
-  scripted:defender        -> scripted guard-heavy ShadowBoxer
-  scripted:pd              -> PD-to-HOME baseline (random arm, stands)
+Design:
+  - JSON file is the single source of truth (league_state.json).
+  - Each fighter has a miner-chosen name, a policy path, and an ELO rating.
+  - Bouts update ELO via standard expected-score math with a K-factor.
+  - When a fighter reaches the top ELO, they can be crowned king; their
+    policy weights are archived to kings/ with a metadata sidecar.
 
-Usage:
-  python3 league.py --entrants models/fighter_v1 scripted:jabbler \
-      scripted:defender scripted:pd --pd --bouts 3 \
-      --out league_standings.json
-  python3 league.py page --standings docs/league_test.json --out docs/index.html
-  python3 league.py update --standings docs/league_standings.json
-  python3 league.py render --standings docs/league_standings.json --pd --steps 5000
+Usage as a library:
+    from league import League
+    lg = League("/path/to/league_state.json")
+    lg.add_fighter("IronFist", "/policies/ironfist.pt")
+    lg.record_bout("IronFist", "StoneHand", winner="IronFist")
+    lg.standings()
+
+Usage from CLI:
+    python league.py --state league_state.json add IronFist /policies/ironfist.pt
+    python league.py --state league_state.json bout IronFist StoneHand --winner IronFist
+    python league.py --state league_state.json standings
+    python league.py --state league_state.json schedule --rounds 1
+    python league.py --state league_state.json crown
 """
-import os, sys, argparse, json, itertools, datetime, html, glob, subprocess
-sys.path.insert(0, os.path.dirname(__file__))
-os.environ.setdefault("MUJOCO_GL", "osmesa")
-import numpy as np
-from stable_baselines3 import PPO
 
-from g1_fighter_env import G1FighterEnv
-from combat import CombatJudge, ShadowBoxer
+from __future__ import annotations
 
+import argparse
+import json
+import os
+import shutil
+import sys
+import time
+import uuid
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
+from typing import Any, Iterable, Optional
 
-# ===========================================================================
-# Round-robin + ELO (was league.py main)
-# ===========================================================================
-def _elo(ra, rb, score_a):
-    """score_a = 1.0 win, 0.5 draw, 0.0 loss. K=32."""
-    k = 32.0
-    ea = 1.0 / (1.0 + 10 ** ((rb - ra) / 400.0))
-    return ra + k * (score_a - ea), rb + k * ((1 - score_a) - (1 - ea))
+# --- Constants ---------------------------------------------------------------
 
+DEFAULT_ELO = 1000.0
+K_FACTOR = 32.0           # Standard chess-style K-factor.
+ELO_DIVISOR = 400.0       # Denominator in the expected-score formula.
 
-class _RandomPD:
-    """PD baseline: random arm residual (still stands via PD legs)."""
-    def __init__(self, env):
-        self.env = env
-    def predict(self, obs, deterministic=True):
-        return self.env.action_space.sample(), None
+KINGS_DIR_NAME = "kings"
+KINGS_META_NAME = "king.json"
 
 
-def _load_entrant(spec, env, for_blue=False):
-    """Return a callable predict(obs)->(action,None) for the entrant.
-    for_blue=True -> loaded as the env's opponent (r2)."""
-    if spec.startswith("scripted:"):
-        style = spec.split(":", 1)[1]
-        if style == "pd":
-            return _RandomPD(env)
-        sb_style = "blue" if for_blue else "red"
-        profile = style if style in ("jabbler", "defender") else "balanced"
-        return ShadowBoxer(env, style=sb_style, profile=profile)
-    return PPO.load(spec)
+# --- Data models ------------------------------------------------------------
 
 
-def run_bout(name_a, spec_a, name_b, spec_b, balance, max_steps,
-              round_seconds, rounds):
-    """One bout: A (red) vs B (blue). balance=None -> PD substrate.
-    Blue is loaded as the env's opponent (r2). Returns
-    (winner_name or None, method, hp, n_rounds)."""
-    env = G1FighterEnv(balance_path=balance, opponent_path=None,
-                       max_steps=max_steps, randomize=False)
-    env.opponent = _load_entrant(spec_b, env, for_blue=True)
-    judge = CombatJudge(env, round_seconds=round_seconds, rounds=rounds)
-    red = _load_entrant(spec_a, env, for_blue=False)
-    obs, _ = env.reset()
-    done = False
-    t = 0
-    while not done and t < max_steps:
-        a1 = red.predict(obs, deterministic=True)[0]
-        obs, rew, term, trunc, info = judge.step(a1)
-        done = term or trunc or judge.ko or (judge.winner is not None)
-        t += 1
-    card = judge.card()
-    w = card["winner"]
-    winner = name_a if w == 0 else (name_b if w == 1 else None)
-    return winner, card["method"], card["final_hp"], len(card["round_scores"])
+def _now() -> float:
+    """UTC unix timestamp (seconds). Kept as a function so tests can patch it."""
+    return time.time()
 
 
-def league_main(argv=None):
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--entrants", nargs="+", required=True,
-                    help="fighter model paths (e.g. models/fighter_a)")
-    ap.add_argument("--balance", default=None,
-                    help="balance model path; omit for PD substrate")
-    ap.add_argument("--pd", action="store_true",
-                    help="use PD-to-HOME substrate")
-    ap.add_argument("--bouts", type=int, default=3,
-                    help="bouts per pair (round-robin)")
-    ap.add_argument("--max_steps", type=int, default=900)
-    ap.add_argument("--round_seconds", type=float, default=30.0)
-    ap.add_argument("--rounds", type=int, default=3)
-    ap.add_argument("--out", default="league_standings.json")
-    a = ap.parse_args(argv)
+@dataclass
+class Fighter:
+    """A miner-submitted fighter and its standing in the league."""
 
-    balance = None if a.pd else a.balance
-    entrants = {os.path.basename(p): p for p in a.entrants}
-    names = list(entrants)
-    elo = {n: 1500.0 for n in names}
-    record = {n: {"W": 0, "L": 0, "D": 0} for n in names}
+    name: str
+    policy_path: str
+    elo: float = DEFAULT_ELO
+    wins: int = 0
+    losses: int = 0
+    draws: int = 0
+    bouts: int = 0
+    created_at: float = field(default_factory=_now)
 
-    print(f"[league] {len(names)} entrants, {a.bouts} bouts/pair, "
-          f"substrate={'PD' if a.pd else balance}")
-    results = []
-    for na, nb in itertools.combinations(names, 2):
-        for b in range(a.bouts):
-            w, method, hp, nr = run_bout(na, entrants[na], nb, entrants[nb],
-                                           balance, a.max_steps,
-                                           a.round_seconds, a.rounds)
-            if w == na:
-                elo[na], elo[nb] = _elo(elo[na], elo[nb], 1.0)
-                record[na]["W"] += 1; record[nb]["L"] += 1
-                score = "A win"
-            elif w == nb:
-                elo[na], elo[nb] = _elo(elo[na], elo[nb], 0.0)
-                record[na]["L"] += 1; record[nb]["W"] += 1
-                score = "B win"
-            else:
-                elo[na], elo[nb] = _elo(elo[na], elo[nb], 0.5)
-                record[na]["D"] += 1; record[nb]["D"] += 1
-                score = "draw"
-            results.append({"red": na, "blue": nb, "bout": b + 1,
-                             "winner": w, "method": method,
-                             "hp": hp, "rounds": nr,
-                             "elo_red": round(elo[na], 1),
-                             "elo_blue": round(elo[nb], 1)})
-            print(f"  {na} vs {nb} #{b+1}: {score} ({method}) "
-                  f"hp={hp} elo={elo[na]:.0f}/{elo[nb]:.0f}")
+    def win_rate(self) -> float:
+        played = self.wins + self.losses + self.draws
+        if played == 0:
+            return 0.0
+        # Draws count as half a win, standard convention.
+        return (self.wins + 0.5 * self.draws) / played
 
-    standings = sorted(
-        [{"name": n, "elo": round(elo[n], 1), **record[n]}
-         for n in names],
-        key=lambda x: -x["elo"])
-    king = standings[0]["name"] if standings else None
-    out = {
-        "king": king,
-        "standings": standings,
-        "results": results,
-        "substrate": "PD" if a.pd else balance,
-        "generated_utc": datetime.datetime.utcnow().isoformat() + "Z",
-    }
-    with open(a.out, "w") as f:
-        json.dump(out, f, indent=2)
-    print(f"\n[league] KING: {king}  elo={standings[0]['elo'] if standings else 0}")
-    print(f"[league] standings -> {a.out}")
-    for s in standings:
-        print(f"   {s['elo']:6.1f}  {s['name']:24s}  "
-              f"W{s['W']} L{s['L']} D{s['D']}")
+    def record(self) -> str:
+        return f"{self.wins}-{self.losses}-{self.draws}"
 
 
-# ===========================================================================
-# gen_league_page.py — league standings HTML page
-# ===========================================================================
-def page(d, bout_map, title_video="bouts/title_bout.mp4"):
-    king = d.get("king") or "TBD"
-    standings = d.get("standings", [])
-    results = d.get("results", [])
-    sub = d.get("substrate", "PD")
-    gen = d.get("generated_utc", "")
+@dataclass
+class Bout:
+    """A completed bout between two fighters."""
 
-    rows = ""
-    for i, s in enumerate(standings, 1):
-        medal = {1: "1", 2: "2", 3: "3"}.get(i, f"{i}")
-        crown = "" if s["name"] == king else ""
-        rows += f"""
-        <tr class="{'king-row' if s['name']==king else ''}">
-          <td class="pos">{medal}</td>
-          <td class="name">{html.escape(s['name'])}{crown}</td>
-          <td class="elo">{s['elo']:.0f}</td>
-          <td>{s['W']}</td><td>{s['L']}</td><td>{s['D']}</td>
-        </tr>"""
-
-    vids = ""
-    for r in results:
-        mp4 = bout_map.get((r["red"], r["blue"]))
-        if not mp4:
-            continue
-        w = r.get("winner") or "Draw"
-        vids += f"""
-      <div class="bout">
-        <div class="bout-head">
-          <span class="red">{html.escape(r['red'])}</span>
-          <span class="vs">vs</span>
-          <span class="blue">{html.escape(r['blue'])}</span>
-        </div>
-        <video controls muted playsinline loop>
-          <source src="{mp4}" type="video/mp4">
-        </video>
-        <div class="bout-meta">
-          <b>{html.escape(str(w))}</b> &middot; {html.escape(str(r.get('method','')))}
-          &middot; HP {r.get('hp', '')} &middot; {r.get('rounds','?')} rounds
-        </div>
-      </div>"""
-
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FightLab &mdash; King of the Hill</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;700&family=Anton&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<style>
-  :root {{
-    --bg: #0a0a0a; --bg2: #111111; --card: #161616; --line: #222222;
-    --mut: #666666; --red: #e74c3c; --red-dim: #c0392b;
-    --gold: #d4af37; --txt: #f0f0f0;
-  }}
-  * {{ box-sizing:border-box; margin:0; padding:0 }}
-  body {{
-    background:var(--bg); color:var(--txt);
-    font-family:'Oswald',sans-serif; font-weight:400;
-    max-width:900px; margin:0 auto; padding:0 24px 60px;
-  }}
-
-  /* Nav back to landing */
-  .nav {{
-    padding:20px 0; border-bottom:1px solid var(--line);
-    display:flex; justify-content:space-between; align-items:center;
-  }}
-  .nav a {{
-    font-family:'Anton',sans-serif; font-size:22px;
-    text-transform:uppercase; text-decoration:none;
-    color:var(--txt); letter-spacing:0.02em;
-  }}
-  .nav a .red {{ color:var(--red); }}
-  .nav .back {{
-    font-family:'Oswald',sans-serif; font-size:13px;
-    color:var(--mut); text-transform:uppercase; letter-spacing:0.1em;
-  }}
-  .nav .back:hover {{ color:var(--red); }}
-
-  h1 {{
-    font-family:'Anton',sans-serif; font-size:48px;
-    text-transform:uppercase; letter-spacing:0.02em;
-    margin:32px 0 4px; line-height:0.9;
-  }}
-  h1 .red {{ color:var(--red); }}
-  .sub {{
-    color:var(--mut); font-size:14px;
-    text-transform:uppercase; letter-spacing:0.2em;
-    margin-bottom:24px;
-  }}
-
-  /* King banner */
-  .king-banner {{
-    margin:0 0 24px; padding:28px; border:1px solid var(--red-dim);
-    border-left:4px solid var(--red);
-    background:linear-gradient(135deg, rgba(231,76,60,0.08), transparent);
-  }}
-  .king-banner .lbl {{
-    color:var(--red); font-size:12px;
-    text-transform:uppercase; letter-spacing:0.3em;
-    font-family:'JetBrains Mono',monospace;
-  }}
-  .king-banner .who {{
-    font-family:'Anton',sans-serif; font-size:32px;
-    text-transform:uppercase; margin-top:6px; color:var(--gold);
-  }}
-
-  /* Standings table */
-  .card {{
-    background:var(--card); border:1px solid var(--line);
-    padding:24px; margin:16px 0;
-  }}
-  h2 {{
-    font-family:'Anton',sans-serif; font-size:28px;
-    text-transform:uppercase; margin-bottom:16px;
-    letter-spacing:0.02em;
-  }}
-  h2 .red {{ color:var(--red); }}
-
-  table {{ width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums }}
-  th, td {{
-    text-align:left; padding:12px 10px;
-    border-bottom:1px solid var(--line);
-    font-family:'Oswald',sans-serif;
-  }}
-  th {{
-    color:var(--mut); font-size:11px; text-transform:uppercase;
-    letter-spacing:0.2em; font-weight:500;
-  }}
-  td.elo {{ font-weight:700; color:var(--gold); font-family:'JetBrains Mono',monospace; }}
-  td.pos {{ width:40px; font-family:'Anton',sans-serif; font-size:20px; color:var(--mut); }}
-  .king-row td {{ background:rgba(231,76,60,0.05); }}
-  .king-row td.elo {{ color:var(--gold); }}
-
-  /* Bouts */
-  .bouts {{ display:grid; grid-template-columns:1fr; gap:16px }}
-  .bout {{
-    background:var(--card); border:1px solid var(--line);
-    overflow:hidden;
-  }}
-  .bout-head {{
-    padding:16px; display:flex; gap:12px;
-    align-items:center; border-bottom:1px solid var(--line);
-    font-family:'Oswald',sans-serif; font-weight:700;
-    text-transform:uppercase; font-size:15px;
-  }}
-  .bout-head .red {{ color:var(--red) }}
-  .bout-head .blue {{ color:#3498db }}
-  .bout-head .vs {{ color:var(--mut); font-weight:400; font-size:12px; letter-spacing:0.2em; }}
-  .bout video {{ width:100%; display:block; background:#000; aspect-ratio:16/9 }}
-  .bout-meta {{ padding:12px 16px; color:var(--mut); font-size:13px; }}
-
-  footer {{
-    margin-top:40px; padding:20px 0; border-top:1px solid var(--line);
-    text-align:center; color:var(--mut); font-size:12px;
-    text-transform:uppercase; letter-spacing:0.1em;
-  }}
-  footer a {{ color:var(--red); text-decoration:none; }}
-  a {{ color:var(--red); text-decoration:none; }}
-</style>
-</head>
-<body>
-  <div class="nav">
-    <a href="index.html">Fight<span class="red">Lab</span></a>
-    <a href="index.html" class="back">Back</a>
-  </div>
-  <h1>King of the <span class="red">Hill</span></h1>
-  <div class="sub">Autonomous humanoid combat league &middot; MuJoCo + RL
-   &middot; substrate: {html.escape(str(sub))}</div>
-
-  <div class="king-banner">
-    <div class="lbl">Current King</div>
-    <div class="who">{html.escape(str(king))}</div>
-  </div>
-
-  <div class="card">
-    <h2>Standings</h2>
-    <table>
-      <thead><tr><th>#</th><th>Fighter</th><th>ELO</th>
-      <th>W</th><th>L</th><th>D</th></tr></thead>
-      <tbody>{rows}
-      </tbody>
-    </table>
-  </div>
-
-  <h2 style="margin-top:26px">Bouts</h2>
-  <div class="bouts">{vids if vids else '<div class="sub">No bout videos rendered yet.</div>'}
-  </div>
-
-  <h2 style="margin-top:26px">Title Bout</h2>
-  <div class="bout">
-    <div class="bout-head">
-      <span class="red">King: {html.escape(str(king))}</span>
-      <span class="vs">vs</span>
-      <span class="blue">Challenger</span>
-    </div>
-    <video controls muted playsinline loop>
-      <source src="{title_video}" type="video/mp4">
-    </video>
-  </div>
-
-  <footer>
-    Generated {html.escape(gen)} UTC &middot; FightLab &middot;
-    <a href="https://github.com/buckZz7/fightlab">github.com/buckZz7/fightlab</a>
-  </footer>
-</body>
-</html>"""
+    bout_id: str
+    fighter_a: str
+    fighter_b: str
+    winner: Optional[str]      # None means draw
+    score_a: float = 0.0
+    score_b: float = 0.0
+    timestamp: float = field(default_factory=_now)
 
 
-def gen_page_main(argv=None):
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--standings", default="docs/league_test.json")
-    ap.add_argument("--out", default="docs/league.html")
-    a = ap.parse_args(argv)
-    d = json.load(open(a.standings))
-    bout_map = {}
-    for r in d.get("results", []):
-        if r.get("mp4"):
-            bout_map[(r["red"], r["blue"])] = r["mp4"]
-    bouts_dir = os.path.join(os.path.dirname(a.out), "bouts")
-    title_video = "bouts/title_bout.mp4"
-    if os.path.exists(bouts_dir):
-        title_files = sorted([f for f in os.listdir(bouts_dir)
-                              if f.startswith("title_cycle") and f.endswith(".mp4")])
-        if title_files:
-            title_video = f"bouts/{title_files[-1]}"
-        elif os.path.exists(os.path.join(bouts_dir, "title_bout.mp4")):
-            title_video = "bouts/title_bout.mp4"
-
-    html_txt = page(d, bout_map, title_video)
-    os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
-    with open(a.out, "w") as f:
-        f.write(html_txt)
-    print(f"[page] wrote {a.out} ({len(html_txt)} chars), "
-          f"{len(bout_map)} bouts with video")
+# --- ELO math ----------------------------------------------------------------
 
 
-# ===========================================================================
-# render_league_bouts.py — render league bouts to MP4 (EGL + tracking cam)
-# ===========================================================================
-def render_bout(spec_a, spec_b, balance, out, steps):
-    """Render a single bout to MP4 using EGL + tracking camera."""
-    import mujoco
-    import PIL.Image
-    import imageio_ffmpeg
-    env = G1FighterEnv(balance_path=balance, opponent_path=None,
-                       max_steps=steps, randomize=False)
-    env.opponent = _load_entrant(spec_b, env, for_blue=True)
-    judge = CombatJudge(env, round_seconds=30.0, rounds=3)
-    red = _load_entrant(spec_a, env, for_blue=False)
-
-    cam_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_CAMERA, "broadcast")
-    r = mujoco.Renderer(env.model, height=720, width=1280)
-
-    frames_dir = out.replace(".mp4", "_frames")
-    os.makedirs(frames_dir, exist_ok=True)
-
-    obs, _ = env.reset()
-    n = 0
-    for t in range(steps):
-        a1, _ = red.predict(obs, deterministic=True)
-        obs, rew, term, trunc, info = judge.step(a1)
-        try:
-            r.update_scene(env.data, camera=cam_id)
-            img = r.render()
-            PIL.Image.fromarray(img).save(f"{frames_dir}/f{t:05d}.png")
-            n += 1
-        except Exception:
-            pass
-        if term or trunc:
-            break
-
-    ff = imageio_ffmpeg.get_ffmpeg_exe()
-    subprocess.run([ff, "-y", "-framerate", "30", "-i",
-                    f"{frames_dir}/f%05d.png", "-c:v", "libx264",
-                    "-pix_fmt", "yuv420p", "-crf", "20", out],
-                   capture_output=True)
-    os.system(f"rm -rf {frames_dir}")
-    print(f"[render] {out} ({n} frames) hp={env.hp}")
+def expected_score(rating_a: float, rating_b: float) -> float:
+    """Expected score for A against B, in [0, 1]."""
+    return 1.0 / (1.0 + 10.0 ** ((rating_b - rating_a) / ELO_DIVISOR))
 
 
-def render_main(argv=None):
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--standings", required=True)
-    ap.add_argument("--steps", type=int, default=5000)
-    ap.add_argument("--out-dir", default="docs/bouts")
-    ap.add_argument("--max-bouts", type=int, default=4)
-    ap.add_argument("--pd", action="store_true")
-    a = ap.parse_args(argv)
+def elo_update(
+    rating_a: float,
+    rating_b: float,
+    score_a: float,
+    k: float = K_FACTOR,
+) -> tuple[float, float]:
+    """Return new (rating_a, rating_b) after a bout.
 
-    os.makedirs(a.out_dir, exist_ok=True)
-    standings = json.load(open(a.standings))
-    bouts = standings.get("bouts", [])[:a.max_bouts]
-
-    for bout in bouts:
-        name_a = bout["a"]
-        name_b = bout["b"]
-        spec_a = bout.get("spec_a", name_a)
-        spec_b = bout.get("spec_b", name_b)
-        fname = f"{name_a}_vs_{name_b}".replace(" ", "_").replace(":", "_")
-        out = os.path.join(a.out_dir, f"{fname}.mp4")
-        print(f"[render] {name_a} vs {name_b} -> {out}")
-        try:
-            render_bout(spec_a, spec_b, None, out, a.steps)
-        except Exception as e:
-            print(f"  [error] {e}")
-
-
-# ===========================================================================
-# league_update.py — auto-update pipeline (cron entry)
-# ===========================================================================
-def _sh(cmd):
-    print(">", " ".join(cmd))
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        print("  [warn]", (r.stderr or r.stdout)[-400:])
-    return r
-
-
-def update_main(argv=None):
-    """Auto-update the king-of-the-hill league page when a trained
-    fighter lands. One-shot: runs the league (mixing trained fighters
-    + scripted reference), renders bouts, regenerates the page, and
-    reports a summary. Intended to be driven by a cron that watches
-    for models/fighter_v1.zip (or newer checkpoints) on the pod.
-
-    Usage:
-      python3 league.py update --standings docs/league_standings.json
+    `score_a` is 1.0 for A win, 0.0 for B win, 0.5 for draw.
+    `score_b` is implicitly `1 - score_a`.
     """
-    os.environ.setdefault("MUJOCO_GL", "egl")
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--standings", default="docs/league_standings.json")
-    ap.add_argument("--bouts", type=int, default=3)
-    ap.add_argument("--max_steps", type=int, default=400)
-    ap.add_argument("--render-steps", type=int, default=300)
-    ap.add_argument("--max-render-bouts", type=int, default=4)
-    a = ap.parse_args(argv)
-
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-    trained = sorted(glob.glob("models/fighter_*.zip"))
-    trained = [p[:-4] for p in trained]  # strip .zip
-    entrants = trained + [
-        "scripted:jabbler", "scripted:defender", "scripted:balanced", "scripted:pd"]
-    print(f"[league] entrants: {entrants}")
-
-    # 1) run the league
-    _sh([sys.executable, __file__,
-        "--entrants", *entrants,
-        "--pd", "--bouts", str(a.bouts),
-        "--max_steps", str(a.max_steps), "--round_seconds", "20",
-        "--out", a.standings])
-
-    # 2) render top bouts
-    _sh([sys.executable, __file__, "render",
-        "--standings", a.standings, "--pd",
-        "--steps", str(a.render_steps), "--out-dir", "docs/bouts",
-        "--max-bouts", str(a.max_render_bouts)])
-
-    # 3) regenerate the page
-    _sh([sys.executable, __file__, "page",
-        "--standings", a.standings, "--out", "docs/index.html"])
-
-    # 4) report
-    d = json.load(open(a.standings))
-    king = d.get("king")
-    print(f"[done] king={king}")
-    for s in d.get("standings", [])[:3]:
-        print(f"  {s['elo']:6.1f} {s['name']:24s} W{s['W']} L{s['L']} D{s['D']}")
+    ea = expected_score(rating_a, rating_b)
+    eb = 1.0 - ea
+    sb = 1.0 - score_a
+    new_a = rating_a + k * (score_a - ea)
+    new_b = rating_b + k * (sb - eb)
+    return round(new_a, 2), round(new_b, 2)
 
 
-# ===========================================================================
-# Subcommand dispatch
-# ===========================================================================
-SUBCOMMANDS = {
-    "page": gen_page_main,
-    "render": render_main,
-    "update": update_main,
-}
+# --- Round-robin scheduler ---------------------------------------------------
 
 
-def main():
-    if len(sys.argv) >= 2 and sys.argv[1] in SUBCOMMANDS:
-        # Subcommand dispatch (page / render / update)
-        SUBCOMMANDS[sys.argv[1]](sys.argv[2:])
+def round_robin(names: list[str], double: bool = False) -> list[tuple[str, str]]:
+    """Generate a round-robin schedule.
+
+    Uses the circle method. If `double`, each pair plays home and away
+    (both orderings). Otherwise single round (each pair once).
+
+    Args:
+        names: fighter names.
+        double: if True, generate home/away (both orderings) for each pair.
+
+    Returns:
+        List of (home, away) tuples in play order.
+    """
+    if len(names) < 2:
+        return []
+    pool = list(names)
+    if len(pool) % 2 != 0:
+        pool.append(None)  # bye
+
+    n = len(pool)
+    half = n // 2
+    fixed = pool[0]
+    rotating = pool[1:]
+    bouts: list[tuple[str, str]] = []
+
+    for _ in range(n - 1):
+        round_fighters = [fixed] + rotating
+        for i in range(half):
+            a = round_fighters[i]
+            b = round_fighters[-1 - i]
+            if a is None or b is None:
+                continue  # bye
+            bouts.append((a, b))
+        # rotate: keep first of rotating fixed, shift the rest
+        rotating = [rotating[-1]] + rotating[:-1]
+
+    if double:
+        bouts = bouts + [(b, a) for (a, b) in bouts]
+
+    return bouts
+
+
+# --- League ------------------------------------------------------------------
+
+
+class League:
+    """The FightLab league. State persists to a JSON file."""
+
+    def __init__(self, state_path: str | Path, kings_dir: str | Path | None = None):
+        self.state_path = Path(state_path)
+        if kings_dir is None:
+            # Default: a sibling `kings` directory next to the state file.
+            kings_dir = self.state_path.parent / KINGS_DIR_NAME
+        self.kings_dir = Path(kings_dir)
+        self.kings_dir.mkdir(parents=True, exist_ok=True)
+        self.fighters: dict[str, Fighter] = {}
+        self.bouts: list[Bout] = []
+        self._load()
+
+    # -- persistence ---------------------------------------------------------
+
+    def _load(self) -> None:
+        if not self.state_path.exists():
+            return
+        with self.state_path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        self.fighters = {
+            name: Fighter(**f) for name, f in data.get("fighters", {}).items()
+        }
+        self.bouts = [Bout(**b) for b in data.get("bouts", [])]
+
+    def _save(self) -> None:
+        data = {
+            "fighters": {n: asdict(f) for n, f in self.fighters.items()},
+            "bouts": [asdict(b) for b in self.bouts],
+        }
+        tmp = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
+        with tmp.open("w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2, sort_keys=True)
+            fh.write("\n")
+        os.replace(tmp, self.state_path)
+
+    # -- fighter management --------------------------------------------------
+
+    def add_fighter(self, name: str, policy_path: str) -> Fighter:
+        """Register a new fighter. Raises if the name is taken."""
+        if name in self.fighters:
+            raise ValueError(f"Fighter '{name}' already exists")
+        fighter = Fighter(name=name, policy_path=policy_path)
+        self.fighters[name] = fighter
+        self._save()
+        return fighter
+
+    def remove_fighter(self, name: str) -> None:
+        """Remove a fighter from the league."""
+        if name not in self.fighters:
+            raise ValueError(f"Fighter '{name}' not found")
+        del self.fighters[name]
+        self._save()
+
+    def get_fighter(self, name: str) -> Fighter:
+        if name not in self.fighters:
+            raise ValueError(f"Fighter '{name}' not found")
+        return self.fighters[name]
+
+    # -- bouts ---------------------------------------------------------------
+
+    def record_bout(
+        self,
+        fighter_a: str,
+        fighter_b: str,
+        winner: Optional[str] = None,
+        score_a: float = 0.0,
+        score_b: float = 0.0,
+    ) -> Bout:
+        """Record a completed bout and update ELO + records.
+
+        `winner` is one of fighter_a, fighter_b, or None (draw).
+        Updates both fighters' ELO and W/L/D counts, and persists state.
+
+        Returns the created Bout.
+        """
+        if fighter_a not in self.fighters:
+            raise ValueError(f"Fighter '{fighter_a}' not found")
+        if fighter_b not in self.fighters:
+            raise ValueError(f"Fighter '{fighter_b}' not found")
+        if fighter_a == fighter_b:
+            raise ValueError("A fighter cannot fight themselves")
+
+        fa = self.fighters[fighter_a]
+        fb = self.fighters[fighter_b]
+
+        if winner is None:
+            score_a_elo = 0.5
+        elif winner == fighter_a:
+            score_a_elo = 1.0
+        elif winner == fighter_b:
+            score_a_elo = 0.0
+        else:
+            raise ValueError(
+                f"winner must be '{fighter_a}', '{fighter_b}', or None (draw); "
+                f"got '{winner}'"
+            )
+
+        new_a, new_b = elo_update(fa.elo, fb.elo, score_a_elo)
+        fa.elo, fb.elo = new_a, new_b
+        fa.bouts += 1
+        fb.bouts += 1
+        if winner is None:
+            fa.draws += 1
+            fb.draws += 1
+        elif winner == fighter_a:
+            fa.wins += 1
+            fb.losses += 1
+        else:
+            fa.losses += 1
+            fb.wins += 1
+
+        bout = Bout(
+            bout_id=uuid.uuid4().hex[:12],
+            fighter_a=fighter_a,
+            fighter_b=fighter_b,
+            winner=winner,
+            score_a=score_a,
+            score_b=score_b,
+        )
+        self.bouts.append(bout)
+        self._save()
+        return bout
+
+    def bout_history(self, fighter: Optional[str] = None) -> list[Bout]:
+        """Return bout history, optionally filtered to one fighter."""
+        if fighter is None:
+            return list(self.bouts)
+        return [
+            b for b in self.bouts
+            if b.fighter_a == fighter or b.fighter_b == fighter
+        ]
+
+    # -- standings -----------------------------------------------------------
+
+    def standings(self) -> list[dict[str, Any]]:
+        """Return fighters ranked by ELO (descending).
+
+        Each row: rank, name, elo, record (W-L-D), win_rate, bouts, policy_path.
+        """
+        rows = []
+        for f in self.fighters.values():
+            rows.append({
+                "name": f.name,
+                "elo": f.elo,
+                "wins": f.wins,
+                "losses": f.losses,
+                "draws": f.draws,
+                "bouts": f.bouts,
+                "win_rate": round(f.win_rate(), 3),
+                "record": f.record(),
+                "policy_path": f.policy_path,
+            })
+        rows.sort(key=lambda r: r["elo"], reverse=True)
+        for i, r in enumerate(rows, start=1):
+            r["rank"] = i
+        return rows
+
+    def king(self) -> Optional[Fighter]:
+        """Return the current top-ELO fighter, or None if the league is empty."""
+        if not self.fighters:
+            return None
+        return max(self.fighters.values(), key=lambda f: f.elo)
+
+    # -- king archiving ------------------------------------------------------
+
+    def crown_king(self) -> Optional[dict[str, Any]]:
+        """Archive the current top-ELO fighter as king.
+
+        Copies their policy file (if it exists) into kings/<name>/
+        and writes a metadata sidecar (king.json). If no policy file exists,
+        only the metadata is written (the weights are expected to arrive
+        out-of-band in the real pipeline).
+
+        Returns the metadata dict, or None if the league is empty.
+        """
+        king = self.king()
+        if king is None:
+            return None
+
+        slug = _slug(king.name)
+        dest_dir = self.kings_dir / slug
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy weights if the policy file exists locally.
+        archived_path: Optional[str]
+        if king.policy_path and Path(king.policy_path).is_file():
+            dest_file = dest_dir / Path(king.policy_path).name
+            shutil.copy2(king.policy_path, dest_file)
+            archived_path = str(dest_file)
+        else:
+            archived_path = None
+
+        meta = {
+            "fighter_name": king.name,
+            "elo": king.elo,
+            "record": king.record(),
+            "wins": king.wins,
+            "losses": king.losses,
+            "draws": king.draws,
+            "bouts": king.bouts,
+            "policy_path": king.policy_path,
+            "archived_path": archived_path,
+            "crowned_at": _now(),
+        }
+        meta_path = dest_dir / KINGS_META_NAME
+        with meta_path.open("w", encoding="utf-8") as fh:
+            json.dump(meta, fh, indent=2, sort_keys=True)
+            fh.write("\n")
+        return meta
+
+    # -- scheduling ----------------------------------------------------------
+
+    def schedule(
+        self,
+        names: Optional[Iterable[str]] = None,
+        double: bool = False,
+    ) -> list[tuple[str, str]]:
+        """Generate a round-robin schedule.
+
+        Args:
+            names: fighter names to schedule. Defaults to all current fighters.
+            double: if True, home-and-away (both orderings) for each pair.
+
+        Returns:
+            List of (home, away) bout tuples in play order.
+        """
+        if names is None:
+            names = list(self.fighters.keys())
+        names = list(names)
+        for n in names:
+            if n not in self.fighters:
+                raise ValueError(f"Fighter '{n}' not found")
+        return round_robin(names, double=double)
+
+
+# --- Helpers ----------------------------------------------------------------
+
+
+def _slug(name: str) -> str:
+    """Filesystem-safe slug for a fighter name."""
+    keep = []
+    for ch in name.strip().lower():
+        if ch.isalnum() or ch in "-_":
+            keep.append(ch)
+        elif ch in " .":
+            keep.append("-")
+    slug = "".join(keep)
+    # collapse runs of '-'
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug.strip("-") or "fighter"
+
+
+# --- CLI --------------------------------------------------------------------
+
+
+def _print_standings(rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        print("No fighters registered.")
         return
-    # Default: run the round-robin league
-    league_main(sys.argv[1:])
+    header = f"{'#':>2}  {'Name':<20} {'ELO':>7}  {'Record':<9}  {'W%':>5}  {'Bouts':>5}  Policy"
+    print(header)
+    print("-" * len(header))
+    for r in rows:
+        print(
+            f"{r['rank']:>2}  {r['name']:<20} {r['elo']:>7.1f}  "
+            f"{r['record']:<9}  {r['win_rate']:>5.3f}  {r['bouts']:>5}  {r['policy_path']}"
+        )
+
+
+def _print_schedule(bouts: list[tuple[str, str]]) -> None:
+    if not bouts:
+        print("No bouts scheduled.")
+        return
+    print(f"{'#':>3}  {'Home':<20} {'Away':<20}")
+    print("-" * 46)
+    for i, (a, b) in enumerate(bouts, 1):
+        print(f"{i:>3}  {a:<20} {b:<20}")
+
+
+def _print_bouts(bouts: list[Bout]) -> None:
+    if not bouts:
+        print("No bouts recorded.")
+        return
+    print(f"{'ID':<12}  {'A':<16} {'B':<16} {'Winner':<16}  {'Score':<11}  Timestamp")
+    print("-" * 92)
+    for b in bouts:
+        winner = b.winner if b.winner is not None else "draw"
+        score = f"{b.score_a:g}-{b.score_b:g}"
+        ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(b.timestamp)) + "Z"
+        print(
+            f"{b.bout_id:<12}  {b.fighter_a:<16} {b.fighter_b:<16} "
+            f"{winner:<16}  {score:<11}  {ts}"
+        )
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="league",
+        description="FightLab league system — ELO rankings, scheduling, king archiving.",
+    )
+    p.add_argument(
+        "--state",
+        default="league_state.json",
+        help="Path to the league state JSON file (default: league_state.json).",
+    )
+    p.add_argument(
+        "--kings-dir",
+        default=None,
+        help="Directory for archived king weights (default: <state_dir>/kings).",
+    )
+
+    sub = p.add_subparsers(dest="command", required=True)
+
+    sp = sub.add_parser("add", help="Register a new fighter.")
+    sp.add_argument("name", help="Fighter name (miner-chosen).")
+    sp.add_argument("policy_path", help="Path to the policy weights file.")
+
+    sp = sub.add_parser("remove", help="Remove a fighter.")
+    sp.add_argument("name")
+
+    sp = sub.add_parser("bout", help="Record a bout result and update ELO.")
+    sp.add_argument("fighter_a")
+    sp.add_argument("fighter_b")
+    g = sp.add_mutually_exclusive_group()
+    g.add_argument("--winner", default=None, help="Name of the winner (default: draw).")
+    sp.add_argument("--score-a", type=float, default=0.0, help="Score for fighter A.")
+    sp.add_argument("--score-b", type=float, default=0.0, help="Score for fighter B.")
+
+    sp = sub.add_parser("standings", help="Print current ELO standings.")
+    sp.add_argument("--json", action="store_true", help="Emit JSON instead of a table.")
+
+    sp = sub.add_parser("schedule", help="Print a round-robin schedule.")
+    sp.add_argument("--rounds", type=int, default=1, choices=[1, 2],
+                    help="1 = single round (default), 2 = home and away.")
+    sp.add_argument("--json", action="store_true", help="Emit JSON instead of a table.")
+
+    sp = sub.add_parser("history", help="Print bout history.")
+    sp.add_argument("fighter", nargs="?", default=None,
+                    help="Filter to one fighter (optional).")
+
+    sp = sub.add_parser("crown", help="Archive the current top-ELO fighter as king.")
+    sp.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
+
+    sp = sub.add_parser("king", help="Show the current top-ELO fighter.")
+    sp.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
+
+    sp = sub.add_parser("show", help="Show one fighter's details.")
+    sp.add_argument("name")
+
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_arg_parser().parse_args(argv)
+    lg = League(args.state, kings_dir=args.kings_dir)
+
+    if args.command == "add":
+        f = lg.add_fighter(args.name, args.policy_path)
+        print(f"Added fighter '{f.name}' (ELO {f.elo:.0f}, policy: {f.policy_path})")
+
+    elif args.command == "remove":
+        lg.remove_fighter(args.name)
+        print(f"Removed fighter '{args.name}'.")
+
+    elif args.command == "bout":
+        bout = lg.record_bout(
+            args.fighter_a, args.fighter_b,
+            winner=args.winner,
+            score_a=args.score_a, score_b=args.score_b,
+        )
+        fa = lg.get_fighter(args.fighter_a)
+        fb = lg.get_fighter(args.fighter_b)
+        w = bout.winner if bout.winner else "draw"
+        print(f"Bout {bout.bout_id}: {args.fighter_a} vs {args.fighter_b} -> {w}")
+        print(f"  {fa.name}: ELO {fa.elo:.1f} ({fa.record()})")
+        print(f"  {fb.name}: ELO {fb.elo:.1f} ({fb.record()})")
+
+    elif args.command == "standings":
+        rows = lg.standings()
+        if args.json:
+            print(json.dumps(rows, indent=2))
+        else:
+            _print_standings(rows)
+
+    elif args.command == "schedule":
+        bouts = lg.schedule(double=(args.rounds == 2))
+        if args.json:
+            print(json.dumps([{"home": a, "away": b} for a, b in bouts], indent=2))
+        else:
+            _print_schedule(bouts)
+
+    elif args.command == "history":
+        bouts = lg.bout_history(args.fighter)
+        _print_bouts(bouts)
+
+    elif args.command == "crown":
+        meta = lg.crown_king()
+        if meta is None:
+            print("No fighters to crown.")
+            return 1
+        if args.json:
+            print(json.dumps(meta, indent=2))
+        else:
+            print(f"Crowned king: {meta['fighter_name']}")
+            print(f"  ELO: {meta['elo']:.1f}  Record: {meta['record']}  Bouts: {meta['bouts']}")
+            if meta.get("archived_path"):
+                print(f"  Weights archived to: {meta['archived_path']}")
+            else:
+                print("  (No local policy file found; metadata written only.)")
+            print(f"  Metadata: {lg.kings_dir / _slug(meta['fighter_name']) / KINGS_META_NAME}")
+
+    elif args.command == "king":
+        k = lg.king()
+        if k is None:
+            print("No fighters registered.")
+            return 1
+        if args.json:
+            print(json.dumps(asdict(k), indent=2))
+        else:
+            print(f"King: {k.name}  ELO {k.elo:.1f}  Record {k.record()}  Bouts {k.bouts}")
+
+    elif args.command == "show":
+        f = lg.get_fighter(args.name)
+        print(json.dumps(asdict(f), indent=2))
+
+    else:
+        build_arg_parser().print_help()
+        return 2
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
