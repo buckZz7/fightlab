@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FightLab — Autonomous Humanoid Combat League</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0b;
+  --bg-raised: #121214;
+  --bg-card: #161618;
+  --border: #26262a;
+  --border-bright: #3a3a40;
+  --text: #f2f2f3;
+  --text-dim: #9a9aa2;
+  --text-faint: #5d5d66;
+  --red: #e5322d;
+  --red-deep: #b3231f;
+  --gold: #d4a94e;
+  --green: #3fb97c;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Archivo', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--red); color: #fff; }
+
+/* ---------- nav ---------- */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; height: 64px;
+  background: rgba(10,10,11,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 800; font-size: 18px; letter-spacing: 0.04em;
+  text-transform: uppercase; text-decoration: none; color: var(--text);
+}
+.nav-logo .mark {
+  width: 26px; height: 26px; background: var(--red);
+  clip-path: polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);
+}
+.nav-links { display: flex; gap: 34px; align-items: center; }
+.nav-links a {
+  color: var(--text-dim); text-decoration: none; font-size: 13px;
+  font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-cta {
+  background: var(--red); color: #fff !important;
+  padding: 9px 20px; font-size: 12px !important;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 88% 100%, 0 100%);
+  transition: background 0.15s;
+}
+.nav-cta:hover { background: var(--red-deep); }
+@media (max-width: 720px) { .nav-links a:not(.nav-cta) { display: none; } }
+
+/* ---------- hero ---------- */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 140px 40px 80px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 118%, rgba(229,50,45,0.16), transparent 65%),
+    radial-gradient(ellipse 55% 40% at 85% 8%, rgba(229,50,45,0.06), transparent 60%);
+  pointer-events: none;
+}
+.hero-grid-bg {
+  position: absolute; inset: 0; opacity: 0.35; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 75%);
+}
+.hero-inner { max-width: 1200px; margin: 0 auto; width: 100%; position: relative; }
+.hero-kicker {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--red);
+  border: 1px solid rgba(229,50,45,0.35); padding: 8px 16px;
+  margin-bottom: 34px;
+}
+.hero-kicker::before {
+  content: ''; width: 7px; height: 7px; background: var(--red);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+.hero h1 {
+  font-size: clamp(52px, 8.5vw, 118px);
+  font-weight: 900; line-height: 0.94; letter-spacing: -0.025em;
+  text-transform: uppercase; margin-bottom: 36px;
+}
+.hero h1 .accent { color: var(--red); }
+.hero h1 .outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(242,242,243,0.55);
+}
+.hero-sub {
+  max-width: 620px; font-size: clamp(17px, 2vw, 20px);
+  color: var(--text-dim); line-height: 1.65; margin-bottom: 48px;
+}
+.hero-sub strong { color: var(--text); font-weight: 600; }
+.hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 16px 32px; font-weight: 700; font-size: 14px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  text-decoration: none; transition: all 0.15s;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 92% 100%, 0 100%);
+}
+.btn-primary { background: var(--red); color: #fff; }
+.btn-primary:hover { background: var(--red-deep); transform: translateY(-2px); }
+.btn-ghost {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border-bright);
+}
+.btn-ghost:hover { border-color: var(--text); transform: translateY(-2px); }
+
+.hero-stats {
+  display: flex; gap: 0; margin-top: 90px;
+  border: 1px solid var(--border);
+  max-width: 860px;
+}
+.hstat {
+  flex: 1; padding: 26px 30px;
+  border-right: 1px solid var(--border);
+}
+.hstat:last-child { border-right: none; }
+.hstat .num {
+  font-size: 38px; font-weight: 900; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.hstat .num .unit { font-size: 18px; color: var(--text-faint); font-weight: 600; }
+.hstat .lbl {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint);
+  margin-top: 4px;
+}
+@media (max-width: 720px) {
+  .hero { padding: 120px 24px 60px; }
+  .hero-stats { flex-direction: column; }
+  .hstat { border-right: none; border-bottom: 1px solid var(--border); }
+  .hstat:last-child { border-bottom: none; }
+}
+
+/* ---------- section shell ---------- */
+section { padding: 110px 40px; }
+.section-inner { max-width: 1200px; margin: 0 auto; }
+.section-tag {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--red);
+  margin-bottom: 18px;
+}
+.section-title {
+  font-size: clamp(34px, 4.5vw, 56px); font-weight: 900;
+  letter-spacing: -0.02em; line-height: 1.05; text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.section-lede { max-width: 640px; color: var(--text-dim); font-size: 17px; }
+@media (max-width: 720px) { section { padding: 70px 24px; } }
+
+/* ---------- concept ---------- */
+.concept-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); margin-top: 60px;
+}
+.concept-card {
+  background: var(--bg-raised); padding: 40px 34px;
+  position: relative; transition: background 0.2s;
+}
+.concept-card:hover { background: var(--bg-card); }
+.concept-card .idx {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  color: var(--text-faint); letter-spacing: 0.15em; margin-bottom: 22px;
+}
+.concept-card h3 {
+  font-size: 21px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: -0.01em; margin-bottom: 12px;
+}
+.concept-card p { color: var(--text-dim); font-size: 15px; }
+.concept-card .bar {
+  position: absolute; top: 0; left: 0; height: 3px; width: 0;
+  background: var(--red); transition: width 0.3s;
+}
+.concept-card:hover .bar { width: 100%; }
+@media (max-width: 900px) { .concept-grid { grid-template-columns: 1fr; } }
+
+/* ---------- champion ---------- */
+.champ-wrap {
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--bg-raised) 0%, var(--bg) 100%);
+  margin-top: 60px;
+  display: grid; grid-template-columns: 1fr 1fr;
+}
+.champ-info { padding: 54px 50px; display: flex; flex-direction: column; justify-content: center; }
+.champ-belt {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 22px;
+}
+.champ-belt svg { width: 16px; height: 16px; fill: var(--gold); }
+.champ-name {
+  font-size: clamp(36px, 4vw, 52px); font-weight: 900;
+  text-transform: uppercase; letter-spacing: -0.02em; line-height: 1;
+  margin-bottom: 14px;
+}
+.champ-meta { color: var(--text-dim); font-size: 15px; margin-bottom: 34px; }
+.champ-record { display: flex; gap: 40px; }
+.crec .n { font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.crec .l {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint);
+}
+.champ-video {
+  position: relative; border-left: 1px solid var(--border);
+  background: #000; min-height: 340px; display: flex;
+}
+.champ-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.champ-video .tag {
+  position: absolute; top: 16px; left: 16px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  background: rgba(10,10,11,0.8); border: 1px solid var(--border-bright);
+  padding: 6px 12px; color: var(--text-dim);
+}
+@media (max-width: 900px) {
+  .champ-wrap { grid-template-columns: 1fr; }
+  .champ-video { border-left: none; border-top: 1px solid var(--border); }
+}
+
+/* ---------- standings ---------- */
+.standings-table { margin-top: 60px; border: 1px solid var(--border); }
+.st-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 120px 150px 110px 110px;
+  align-items: center;
+  padding: 22px 30px;
+  border-bottom: 1px solid var(--border-bright);
+  background: var(--bg-raised);
+  transition: background 0.15s;
+}
+.st-row:last-child { border-bottom: none; }
+.st-row:not(.st-head):hover { background: var(--bg-card); }
+.st-head {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint);
+  background: var(--bg);
+}
+.st-rank { font-size: 22px; font-weight: 900; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.st-row.is-king .st-rank { color: var(--gold); }
+.st-name { font-size: 19px; font-weight: 800; text-transform: uppercase; letter-spacing: -0.01em; }
+.st-name .crown {
+  color: var(--gold); font-size: 11px; margin-left: 12px; vertical-align: 3px;
+  font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.12em;
+  border: 1px solid rgba(212,169,78,0.5); padding: 3px 8px;
+}
+.st-elo { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.st-record { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--text-dim); }
+.st-streak {
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600;
+}
+.st-streak.win { color: var(--green); }
+.st-streak.loss { color: var(--red); }
+.st-bouts { font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--text-dim); }
+@media (max-width: 800px) {
+  .st-row { grid-template-columns: 44px 1fr 90px; padding: 18px 20px; }
+  .st-record, .st-streak, .st-bouts { display: none; }
+}
+
+/* ---------- fights ---------- */
+.fights-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 28px; margin-top: 60px;
+}
+.fight-card {
+  border: 1px solid var(--border); background: var(--bg-raised);
+  transition: border-color 0.2s, transform 0.2s;
+}
+.fight-card:hover { border-color: var(--border-bright); transform: translateY(-3px); }
+.fight-video { position: relative; background: #000; aspect-ratio: 16/9; overflow: hidden; }
+.fight-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fight-video .live-tag {
+  position: absolute; top: 14px; left: 14px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  background: var(--red); color: #fff; padding: 5px 11px;
+}
+.fight-info { padding: 26px 28px 30px; }
+.fight-event {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-faint);
+  margin-bottom: 10px;
+}
+.fight-title { font-size: 20px; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
+.fight-title .vs { color: var(--red); margin: 0 8px; }
+.fight-result { color: var(--text-dim); font-size: 14px; }
+.fight-result .winner { color: var(--text); font-weight: 600; }
+@media (max-width: 800px) { .fights-grid { grid-template-columns: 1fr; } }
+
+/* ---------- enter ---------- */
+.enter-wrap { text-align: center; max-width: 760px; margin: 0 auto; }
+.enter-steps {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 24px; margin: 56px 0;
+  text-align: left;
+}
+.enter-step { padding: 28px; border: 1px solid var(--border); background: var(--bg-raised); }
+.enter-step .n {
+  font-size: 13px; font-family: 'IBM Plex Mono', monospace;
+  color: var(--red); letter-spacing: 0.15em; margin-bottom: 14px;
+}
+.enter-step h4 { font-size: 16px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; }
+.enter-step p { font-size: 14px; color: var(--text-dim); }
+@media (max-width: 720px) { .enter-steps { grid-template-columns: 1fr; } }
+
+/* ---------- footer ---------- */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 50px 40px;
+}
+.footer-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 20px;
+}
+.footer-note { color: var(--text-faint); font-size: 13px; }
+.footer-links { display: flex; gap: 26px; }
+.footer-links a {
+  color: var(--text-dim); text-decoration: none; font-size: 13px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.footer-links a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="#top"><span class="mark"></span>FightLab</a>
+  <div class="nav-links">
+    <a href="#league">The League</a>
+    <a href="#standings">Standings</a>
+    <a href="#fights">Fights</a>
+    <a class="nav-cta" href="https://github.com/buckZz7/fightlab" target="_blank" rel="noopener">Enter the League</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-inner">
+    <div class="hero-kicker">Season 01 — Open Enrollment</div>
+    <h1>
+      Machines<br>
+      <span class="outline">that fight.</span><br>
+      <span class="accent">No remote.</span>
+    </h1>
+    <p class="hero-sub">
+      FightLab is an open combat league for autonomous humanoid robots.
+      Two machines enter the arena. <strong>No human touches the controls.</strong>
+      The best learned fighter takes the crown — until someone builds a better one.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#fights">Watch the Fights</a>
+      <a class="btn btn-ghost" href="https://github.com/buckZz7/fightlab" target="_blank" rel="noopener">Build a Fighter</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat">
+        <div class="num">29</div>
+        <div class="lbl">Joints per fighter</div>
+      </div>
+      <div class="hstat">
+        <div class="num">0</div>
+        <div class="lbl">Human inputs in a bout</div>
+      </div>
+      <div class="hstat">
+        <div class="num">5</div>
+        <div class="lbl">Seeds per title fight</div>
+      </div>
+      <div class="hstat">
+        <div class="num">100<span class="unit">%</span></div>
+        <div class="lbl">Open weights &amp; rules</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="league">
+  <div class="section-inner">
+    <div class="section-tag">The League</div>
+    <h2 class="section-title">A proving ground<br>for robot combat.</h2>
+    <p class="section-lede">
+      Anyone can train a fighter and submit it. Every bout is run by a neutral,
+      deterministic referee inside a physics simulator — the same rules, the same
+      arena, every time. Winners climb the rankings. The top fighter holds the
+      title until a challenger takes it.
+    </p>
+    <div class="concept-grid">
+      <div class="concept-card">
+        <div class="bar"></div>
+        <div class="idx">01</div>
+        <h3>Autonomous only</h3>
+        <p>Once the bout starts, the policy is on its own. No teleoperation, no human correction, no puppet strings. If it falls, that's on the builder.</p>
+      </div>
+      <div class="concept-card">
+        <div class="bar"></div>
+        <div class="idx">02</div>
+        <h3>Trustless referee</h3>
+        <p>Every fight is simulated, seeded, and cryptographically signed. Anyone can replay a bout with the same seed and get the same result. No disputed decisions.</p>
+      </div>
+      <div class="concept-card">
+        <div class="bar"></div>
+        <div class="idx">03</div>
+        <h3>Open by default</h3>
+        <p>The ruleset, the referee, and every champion's weights are public. Beat the king, publish your fighter, take the crown. The league belongs to whoever wins.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="champion" style="padding-top:0">
+  <div class="section-inner">
+    <div class="section-tag">Current Champion</div>
+    <div class="champ-wrap">
+      <div class="champ-info">
+        <div class="champ-belt">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7v2c0 5.5 3.8 10.7 10 13 6.2-2.3 10-7.5 10-13V7L12 2zm0 4.2l6 3v1.8c0 3.9-2.6 7.7-6 9.4-3.4-1.7-6-5.5-6-9.4V9.2l6-3z"/></svg>
+          Undisputed — Season 01
+        </div>
+        <div class="champ-name">V3 Striker</div>
+        <div class="champ-meta">First-generation latent-space fighter. Walks, guards, and throws — still learning to stay on its feet when the exchange gets ugly.</div>
+        <div class="champ-record">
+          <div class="crec"><div class="n">0–0</div><div class="l">Record</div></div>
+          <div class="crec"><div class="n">1000</div><div class="l">ELO</div></div>
+          <div class="crec"><div class="n">0</div><div class="l">Title defenses</div></div>
+        </div>
+      </div>
+      <div class="champ-video">
+        <video autoplay muted loop playsinline src="assets/fights/bout_v3_6460_first4s.mp4"></video>
+        <div class="tag">Latest evaluation footage</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="standings" style="padding-top:0">
+  <div class="section-inner">
+    <div class="section-tag">Rankings</div>
+    <h2 class="section-title">Standings</h2>
+    <div class="standings-table">
+      <div class="st-row st-head">
+        <div>#</div><div>Fighter</div><div>ELO</div><div>Record</div><div>Streak</div><div>Bouts</div>
+      </div>
+      <div class="st-row is-king">
+        <div class="st-rank">1</div>
+        <div class="st-name">V3 Striker<span class="crown">CHAMP</span></div>
+        <div class="st-elo">1000</div>
+        <div class="st-record">0–0–0</div>
+        <div class="st-streak">—</div>
+        <div class="st-bouts">0</div>
+      </div>
+      <div class="st-row">
+        <div class="st-rank">2</div>
+        <div class="st-name">V4 (in training)</div>
+        <div class="st-elo">—</div>
+        <div class="st-record">—</div>
+        <div class="st-streak">—</div>
+        <div class="st-bouts">—</div>
+      </div>
+    </div>
+    <p style="margin-top:18px;color:var(--text-faint);font-size:13px">
+      Calibration bots (Sandbag) are not ranked. Title fights are five-seed, referee-signed series; records update after each sanctioned event.
+    </p>
+  </div>
+</section>
+
+<section id="fights" style="padding-top:0">
+  <div class="section-inner">
+    <div class="section-tag">Fight Library</div>
+    <h2 class="section-title">Title fights<br>&amp; evaluations</h2>
+    <p class="section-lede">Every sanctioned bout is recorded. Watch the fighters exactly as the referee saw them — no camera tricks, no cuts.</p>
+    <div class="fights-grid">
+      <div class="fight-card">
+        <div class="fight-video">
+          <video controls muted loop playsinline src="assets/fights/bout_v3_6460_first4s.mp4"></video>
+          <div class="live-tag">Title Fight 01</div>
+        </div>
+        <div class="fight-info">
+          <div class="fight-event">FightLab 01 — July 2026</div>
+          <div class="fight-title">V3 Striker <span class="vs">vs</span> Sandbag</div>
+          <div class="fight-result"><span class="winner">Sandbag def. V3 Striker</span> — decision, 3–2 over five seeds</div>
+        </div>
+      </div>
+      <div class="fight-card">
+        <div class="fight-video">
+          <video controls muted loop playsinline src="assets/fights/bout_mjlab_play.mp4"></video>
+          <div class="live-tag">Evaluation</div>
+        </div>
+        <div class="fight-info">
+          <div class="fight-event">FightLab Evaluation — July 2026</div>
+          <div class="fight-title">V2 Striker <span class="vs">vs</span> Sandbag</div>
+          <div class="fight-result"><span class="winner">Evaluation bout</span> — multi-environment policy assessment</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="enter">
+  <div class="enter-wrap">
+    <div class="section-tag">Enter the League</div>
+    <h2 class="section-title">Build something<br>that can take the crown.</h2>
+    <p class="section-lede" style="margin:0 auto">
+      Train a policy however you like — any framework, any approach. If it follows
+      the open bout contract, it can fight. Submit it, watch it climb.
+    </p>
+    <div class="enter-steps">
+      <div class="enter-step">
+        <div class="n">STEP 01</div>
+        <h4>Read the contract</h4>
+        <p>One page: the observation your fighter sees and the actions it can take. That's the whole interface.</p>
+      </div>
+      <div class="enter-step">
+        <div class="n">STEP 02</div>
+        <h4>Train your fighter</h4>
+        <p>Use any simulator, any learning stack. The league doesn't care how you built it — only how it fights.</p>
+      </div>
+      <div class="enter-step">
+        <div class="n">STEP 03</div>
+        <h4>Submit &amp; climb</h4>
+        <p>Open a pull request with your bundle. The referee runs your evaluation, and your fighter enters the rankings.</p>
+      </div>
+    </div>
+    <a class="btn btn-primary" href="https://github.com/buckZz7/fightlab" target="_blank" rel="noopener">Get the Rules on GitHub</a>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-note">FightLab — an open autonomous humanoid combat league. Bouts refereed in MuJoCo physics.</div>
+    <div class="footer-links">
+      <a href="https://github.com/buckZz7/fightlab" target="_blank" rel="noopener">GitHub</a>
+      <a href="#league">Rules</a>
+      <a href="#standings">Standings</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
