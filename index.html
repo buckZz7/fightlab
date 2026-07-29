@@ -363,14 +363,6 @@ section { padding: 110px 40px; }
   transition: border-color 0.2s;
 }
 .bout-card:hover { border-color: var(--border-bright); }
-.corner-label {
-  position: absolute; top: 12px;
-  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 4px 9px; font-weight: 600;
-}
-.red-lbl { left: 12px; background: rgba(229,50,45,0.92); color: #fff; }
-.blue-lbl { right: 12px; background: rgba(60,110,190,0.92); color: #fff; }
 .bout-info { padding: 20px 24px 24px; }
 .bout-head {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -632,7 +624,7 @@ footer {
     <h2 class="section-title">FightLab 01</h2>
     <p class="section-lede">
       The first title series: five seeded bouts, referee-signed, every one recorded.
-      Red corner is always the reigning champion, blue corner the challenger.
+      The red fighter is the reigning champion, the blue fighter the challenger.
       Each card carries its seed and signed payload hash — replay any bout through
       the referee and you get the same result.
     </p>
@@ -658,8 +650,6 @@ footer {
       <div class="bout-card">
         <div class="fight-video">
           <video controls muted loop playsinline src="assets/fights/fl01/seed1.mp4"></video>
-          <div class="corner-label red-lbl">RED V3 Striker</div>
-          <div class="corner-label blue-lbl">BLUE Sandbag</div>
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 1</span><span class="bout-seed">seed 1</span></div>
@@ -673,8 +663,6 @@ footer {
       <div class="bout-card">
         <div class="fight-video">
           <video controls muted loop playsinline src="assets/fights/fl01/seed2.mp4"></video>
-          <div class="corner-label red-lbl">RED V3 Striker</div>
-          <div class="corner-label blue-lbl">BLUE Sandbag</div>
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 2</span><span class="bout-seed">seed 2</span></div>
@@ -688,8 +676,6 @@ footer {
       <div class="bout-card">
         <div class="fight-video">
           <video controls muted loop playsinline src="assets/fights/fl01/seed3.mp4"></video>
-          <div class="corner-label red-lbl">RED V3 Striker</div>
-          <div class="corner-label blue-lbl">BLUE Sandbag</div>
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 3</span><span class="bout-seed">seed 3</span></div>
@@ -703,8 +689,6 @@ footer {
       <div class="bout-card">
         <div class="fight-video">
           <video controls muted loop playsinline src="assets/fights/fl01/seed4.mp4"></video>
-          <div class="corner-label red-lbl">RED V3 Striker</div>
-          <div class="corner-label blue-lbl">BLUE Sandbag</div>
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 4</span><span class="bout-seed">seed 4</span></div>
@@ -718,8 +702,6 @@ footer {
       <div class="bout-card">
         <div class="fight-video">
           <video controls muted loop playsinline src="assets/fights/fl01/seed5.mp4"></video>
-          <div class="corner-label red-lbl">RED V3 Striker</div>
-          <div class="corner-label blue-lbl">BLUE Sandbag</div>
         </div>
         <div class="bout-info">
           <div class="bout-head"><span class="bout-num">Bout 5</span><span class="bout-seed">seed 5</span></div>
