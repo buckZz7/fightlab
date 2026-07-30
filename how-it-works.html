@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How FightLab Works — Contract, Rewards, Evaluation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0b; --bg-raised: #131315; --border: #26262a;
+  --text: #f2f2f3; --text-dim: #9a9aa2; --text-faint: #5d5d66;
+  --red: #e5322d; --gold: #d4a94e; --green: #3fb97c;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Archivo', sans-serif; font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+a { color: var(--red); }
+code { font-family: 'IBM Plex Mono', monospace; font-size: 0.92em; color: var(--green); background: rgba(63,185,124,0.08); padding: 1px 5px; }
+
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 64px; background: rgba(10,10,11,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; text-decoration: none; color: var(--text); }
+.nav-logo .mark { width: 22px; height: 22px; background: var(--red); }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-left: 26px; }
+.nav-links a:hover { color: var(--text); }
+
+.doc { max-width: 780px; margin: 0 auto; padding: 130px 24px 90px; }
+h1 { font-size: clamp(32px, 5vw, 48px); font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; line-height: 1.05; margin-bottom: 14px; }
+.lede { color: var(--text-dim); font-size: 17px; margin-bottom: 54px; }
+h2 { font-size: 22px; font-weight: 800; text-transform: uppercase; margin: 52px 0 14px; padding-top: 20px; border-top: 1px solid var(--border); }
+h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+h3 { font-size: 16px; font-weight: 700; margin: 26px 0 8px; color: var(--text); }
+p { color: var(--text-dim); margin-bottom: 14px; }
+p strong, li strong { color: var(--text); }
+ul { color: var(--text-dim); padding-left: 22px; margin-bottom: 14px; }
+li { margin-bottom: 6px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+th { text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); padding: 8px 10px; border-bottom: 1px solid var(--border); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+td:first-child { color: var(--text); font-weight: 600; }
+.kv { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--text-dim); background: var(--bg-raised); border: 1px solid var(--border); padding: 18px 22px; margin: 16px 0 22px; line-height: 1.9; }
+.kv b { color: var(--text); font-weight: 600; }
+.tag { display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); border: 1px solid rgba(212,169,78,0.4); padding: 2px 8px; vertical-align: 2px; margin-left: 8px; }
+footer { border-top: 1px solid var(--border); padding: 34px 24px; text-align: center; color: var(--text-faint); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><span class="mark"></span>FightLab</a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="https://github.com/buckZz7/fightlab" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</nav>
+
+<div class="doc">
+
+<h1>How FightLab Works</h1>
+<p class="lede">The contract, the rewards, and the evaluation — in plain terms. Everything here is reproducible from the repo.</p>
+
+<h2>The Contract</h2>
+<p>A fighter is a black box: <strong>given the standard observation, return joint position targets</strong>. Nothing else is specified — train in any stack, use any architecture.</p>
+<div class="kv">
+<b>Observation (73 floats)</b><br>
+0:3&nbsp;&nbsp;&nbsp;&nbsp;root angular velocity (body frame)<br>
+3:32&nbsp;&nbsp;&nbsp;joint positions relative to guard pose (29 joints)<br>
+32:61&nbsp;&nbsp;joint velocities (29)<br>
+61:67&nbsp;&nbsp;opponent torso − your fists, your frame (3+3)<br>
+67:73&nbsp;&nbsp;opponent pelvis − your torso, your frame (3+3)<br><br>
+<b>Action (29 floats)</b> — joint position targets (radians), 30 Hz.<br>
+Joints: 12 leg + 3 waist + 7 per arm (shoulder ×3, elbow, wrist roll/pitch/yaw).<br><br>
+<b>Robot</b> — Unitree G1, 29-DoF, identical for both fighters. No physical variation.
+</div>
+<p>The full spec with joint order and actuator constants is <code>docs/policy-contract.md</code> in the repo. The interface version is <code>fightlab-contract=2</code>.</p>
+
+<h2>The Rules (v5)</h2>
+<ul>
+  <li><strong>No referee stand-ups.</strong> Fall and you stay down until you get yourself up or the bout ends.</li>
+  <li><strong>KO:</strong> opponent HP to zero. Double KO in the same moment is a draw.</li>
+  <li><strong>Decision at the cap</strong> (10 seconds): HP margin ≥ 5 decides; else ground-time margin ≥ 3 s decides; else draw.</li>
+  <li><strong>Strikes count only when you're upright</strong> (pelvis above 0.5 m) and swinging (arm speed toward the opponent ≥ 1 m/s). Falling into someone is not a punch.</li>
+  <li><strong>Series:</strong> five seeded bouts. Win the majority, take the result. Draw — champion keeps the belt.</li>
+</ul>
+
+<h2>The Reward Stack (training)</h2>
+<p>Our reference training recipe (v6, current champion lineage):</p>
+<table>
+  <tr><th>Term</th><th>What it pays for</th></tr>
+  <tr><td>Facing</td><td>Square up to the opponent</td></tr>
+  <tr><td>Approach velocity</td><td>Move toward the opponent with intent</td></tr>
+  <tr><td>Fist distance</td><td>Get hands near the opponent's torso</td></tr>
+  <tr><td>Hit</td><td>Upright, fast strikes that connect (scaled by punch speed)</td></tr>
+  <tr><td>Defense penalty</td><td>−8 when you take a high-velocity hit (RoboStriker design)</td></tr>
+  <tr><td>Get-up curriculum</td><td>When down: raise pelvis, orient upright, feet under body (HumanUP)</td></tr>
+  <tr><td>Recovery bonus</td><td>+5 once when you get back up after a real knockdown</td></tr>
+  <tr><td>Ground penalty</td><td>−0.5 per step on the floor — time down is always expensive</td></tr>
+  <tr><td>AMP style</td><td>Look like the mocap (adversarial motion prior)</td></tr>
+</table>
+<p>Skills come from a distilled motion prior (78 mocap clips: boxing, footwork, kicks, get-ups) — the policy outputs a 32-D residual over that manifold, not raw joint targets.</p>
+
+<h2>The Evaluation (trustless)</h2>
+<ul>
+  <li>The referee (<code>engine/eval_harness.py</code>) runs the series with fixed seeds, no domain randomization.</li>
+  <li>Every result carries a <strong>SHA-256 payload hash</strong> over the full series data. Recompute it: <code>python miner_sdk.py verify result.json</code>.</li>
+  <li>Replay any bout with the same seed and env pin — same result, bit for bit.</li>
+  <li>Nothing is judged by us. The physics decides.</li>
+</ul>
+
+<h2>The League Structure</h2>
+<p>King of the hill. No ratings, no points. The record is:</p>
+<ul>
+  <li><strong>Reigns</strong> — who holds the belt, defenses, dates</li>
+  <li><strong>Title fights</strong> — champion vs challenger, signed series, video</li>
+  <li><strong>Submission decisions</strong> — every evaluated policy gets a signed result on record</li>
+</ul>
+<p>Challengers fight the champion directly until past kings exist; then the gauntlet: beat recent former kings to earn a title shot. A draw means the champion retains.</p>
+
+<h2>Current Status</h2>
+<div class="kv">
+<b>Champion:</b> V3 Striker (inaugural, contract v1 fighter)<br>
+<b>In training:</b> V6 — first 29-DoF fighter: full wrist control, no-stand-up rules, HumanUP get-up curriculum, push robustness. When it passes evaluation, it challenges for the belt in FightLab 02.
+</div>
+
+</div>
+
+<footer>
+  FightLab — an open autonomous humanoid combat league · <a href="https://github.com/buckZz7/fightlab">GitHub</a>
+</footer>
+
+</body>
+</html>
