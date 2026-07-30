@@ -152,6 +152,10 @@ section { padding: 90px 40px; }
 .fight-result.loss { color: var(--red); }
 .fight-result.draw { color: var(--text-dim); }
 .fight-detail { font-size: 13px; color: var(--text-dim); }
+.scoreline { font-size: 15px; font-weight: 700; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+.scoreline .rname { color: var(--red); }
+.scoreline .bname { color: #5a8fd6; }
+.scoreline .sc { color: var(--text); padding: 0 6px; }
 @media (max-width: 720px) { .fights-grid { grid-template-columns: 1fr; } }
 
 .series-line {
@@ -298,7 +302,7 @@ footer { border-top: 1px solid var(--border); padding: 40px; }
         <div class="fight-info">
           <div class="fight-head"><span class="fight-num">Bout 1</span><span class="fight-seed">seed 1</span></div>
           <div class="fight-result draw">Draw</div>
-          <div class="fight-detail">36–39 damage. Both down, no finisher.</div>
+          <div class="scoreline"><span class="rname">V3 Striker</span><span class="sc">36 – 39</span><span class="bname">Sandbag</span></div>
         </div>
       </div>
       <div class="fight-card">
@@ -306,7 +310,7 @@ footer { border-top: 1px solid var(--border); padding: 40px; }
         <div class="fight-info">
           <div class="fight-head"><span class="fight-num">Bout 2</span><span class="fight-seed">seed 2</span></div>
           <div class="fight-result win">Striker wins — decision</div>
-          <div class="fight-detail">36–15 damage. Out-struck 2-to-1.</div>
+          <div class="scoreline"><span class="rname">V3 Striker</span><span class="sc">36 – 15</span><span class="bname">Sandbag</span></div>
         </div>
       </div>
       <div class="fight-card">
@@ -314,7 +318,7 @@ footer { border-top: 1px solid var(--border); padding: 40px; }
         <div class="fight-info">
           <div class="fight-head"><span class="fight-num">Bout 3</span><span class="fight-seed">seed 3</span></div>
           <div class="fight-result draw">Draw</div>
-          <div class="fight-detail">32–37 damage. Scrappy, both on the floor.</div>
+          <div class="scoreline"><span class="rname">V3 Striker</span><span class="sc">32 – 37</span><span class="bname">Sandbag</span></div>
         </div>
       </div>
       <div class="fight-card">
@@ -322,7 +326,7 @@ footer { border-top: 1px solid var(--border); padding: 40px; }
         <div class="fight-info">
           <div class="fight-head"><span class="fight-num">Bout 4</span><span class="fight-seed">seed 4</span></div>
           <div class="fight-result win">Striker wins — decision</div>
-          <div class="fight-detail">78–31 damage. Best bout of the series.</div>
+          <div class="scoreline"><span class="rname">V3 Striker</span><span class="sc">78 – 31</span><span class="bname">Sandbag</span></div>
         </div>
       </div>
       <div class="fight-card">
@@ -330,7 +334,7 @@ footer { border-top: 1px solid var(--border); padding: 40px; }
         <div class="fight-info">
           <div class="fight-head"><span class="fight-num">Bout 5</span><span class="fight-seed">seed 5</span></div>
           <div class="fight-result loss">Sandbag wins — decision</div>
-          <div class="fight-detail">13–59 damage. Striker fell early.</div>
+          <div class="scoreline"><span class="rname">V3 Striker</span><span class="sc">13 – 59</span><span class="bname">Sandbag</span></div>
         </div>
       </div>
     </div>
