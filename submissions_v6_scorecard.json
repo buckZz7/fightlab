@@ -1,0 +1,59 @@
+{
+  "bundle": "/opt/data/fightlab/submissions/v6",
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "max_steps": 300,
+  "archetypes": {
+    "pressure": {
+      "record": "0-3-0",
+      "win_rate": 0.0,
+      "dmg_ratio": 0.42,
+      "dmg_for": 135.1,
+      "dmg_against": 323.7,
+      "ground_time_self": 761,
+      "ground_time_opp": 761
+    },
+    "counter": {
+      "record": "2-1-0",
+      "win_rate": 0.667,
+      "dmg_ratio": 1.29,
+      "dmg_for": 139.0,
+      "dmg_against": 107.8,
+      "ground_time_self": 694,
+      "ground_time_opp": 712
+    },
+    "shell": {
+      "record": "3-0-0",
+      "win_rate": 1.0,
+      "dmg_ratio": 40.08,
+      "dmg_for": 216.0,
+      "dmg_against": 5.4,
+      "ground_time_self": 736,
+      "ground_time_opp": 720
+    },
+    "chaos": {
+      "record": "2-0-1",
+      "win_rate": 0.667,
+      "dmg_ratio": 2.51,
+      "dmg_for": 152.2,
+      "dmg_against": 60.6,
+      "ground_time_self": 707,
+      "ground_time_opp": 732
+    },
+    "mirror": {
+      "record": "1-2-0",
+      "win_rate": 0.333,
+      "dmg_ratio": 0.86,
+      "dmg_for": 168.6,
+      "dmg_against": 196.7,
+      "ground_time_self": 714,
+      "ground_time_opp": 718
+    }
+  },
+  "weakest": "pressure",
+  "strongest": "shell",
+  "overall_win_rate": 0.533
+}
