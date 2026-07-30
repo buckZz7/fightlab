@@ -1,0 +1,20 @@
+{
+  "name": "V6",
+  "version": "1.0.0",
+  "contract": "fightlab-contract=2",
+  "obs_dim": 73,
+  "action_dim": 29,
+  "created": "2026-07-30",
+  "training": {
+    "stack": "mjlab PPO, latent-residual action (32D delta_z over distilled 29-DoF motion manifold)",
+    "latent": "latent_29.pt (distilled from mjlab tracker on 78 clips; MSE 0.00018)",
+    "rules": "v5 no-stand-up + HumanUP get-up reward + push events",
+    "envs": 512,
+    "iterations": 5000
+  },
+  "files": {
+    "policy": "policy.pt",
+    "latent": "latent_29.pt"
+  },
+  "notes": "Self-contained: policy.py loads policy.pt (PPO actor, 73->32) and latent_29.pt (frozen prior+decoder). Eval uses the prior mean path (deterministic)."
+}
