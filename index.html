@@ -160,6 +160,15 @@ section { padding: 90px 40px; }
 }
 .series-line .score { font-size: 22px; font-weight: 900; color: var(--text); }
 .series-line code { color: var(--green); font-size: 12px; }
+.verify-link {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.verify-link:hover { color: var(--text); }
+.verify-note {
+  margin-top: 14px; font-size: 13px; color: var(--text-faint); max-width: 640px;
+}
+.verify-note code { color: var(--text-dim); font-size: 12px; }
 
 /* ---------- path / enter ---------- */
 .path { margin-top: 40px; display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); }
@@ -259,7 +268,12 @@ footer { border-top: 1px solid var(--border); padding: 40px; }
       <span class="score">2–2–1</span>
       <span>draw — champion keeps the belt</span>
       <span>signed <code>b0e135c62edd3eb0…</code></span>
+      <a class="verify-link" href="assets/fights/fl01/result_signed.json" target="_blank" rel="noopener">result json</a>
     </div>
+    <p class="verify-note">
+      Don't trust the score? Verify it: <code>python miner_sdk.py verify runs/bout_v3_vs_sandbag_v5_signed.json</code>
+      recomputes the payload hash. Replay any bout through <code>engine/eval_harness.py</code> with the same seed — same result.
+    </p>
 
     <div class="fights-grid">
       <div class="fight-card">

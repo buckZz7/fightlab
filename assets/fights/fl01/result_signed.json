@@ -1,0 +1,111 @@
+{
+  "bout_id": "5eb6aef638804e3393d6769dae741a2a",
+  "config": {
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "max_steps": 300,
+    "damage_threshold": 50.0,
+    "size_cap_bytes": 52428800,
+    "env_config": {
+      "obs_dim": 41,
+      "act_dim": 17,
+      "sim_dt": 0.0025,
+      "max_steps": 1000,
+      "opponent": "sandbag"
+    }
+  },
+  "env_config_hash": "3d6419e20dd77c42c65c54af8e48291c45bd10d6dc3d9a12a2665d84b4eb6bf8",
+  "policy_a": {
+    "path": "/opt/data/fightlab/submissions/fightlab-v3",
+    "sha256": "e497e92bba487db50b01a8c6532e88b223213ade07ef43039ae87da4d95e34cf",
+    "size_bytes": 22479420
+  },
+  "policy_b": {
+    "path": "sandbag",
+    "sha256": "7c0ca72a32109a28986311782e56eccf1a4883babf70a4c0136e20cc8d3c7613",
+    "size_bytes": 0
+  },
+  "seed_results": [
+    {
+      "seed": 1,
+      "winner": null,
+      "damage_dealt_a": 36.31,
+      "damage_dealt_b": 39.28,
+      "steps_survived_a": 55,
+      "steps_survived_b": 64,
+      "score_a": 36.3127,
+      "score_b": 39.2761,
+      "terminated": false,
+      "timestamp": "2026-07-29T20:07:35.617964Z"
+    },
+    {
+      "seed": 2,
+      "winner": "A",
+      "damage_dealt_a": 35.62,
+      "damage_dealt_b": 15.41,
+      "steps_survived_a": 53,
+      "steps_survived_b": 71,
+      "score_a": 35.624,
+      "score_b": 15.4057,
+      "terminated": false,
+      "timestamp": "2026-07-29T20:07:36.645623Z"
+    },
+    {
+      "seed": 3,
+      "winner": null,
+      "damage_dealt_a": 31.66,
+      "damage_dealt_b": 36.62,
+      "steps_survived_a": 51,
+      "steps_survived_b": 52,
+      "score_a": 31.6574,
+      "score_b": 36.6181,
+      "terminated": false,
+      "timestamp": "2026-07-29T20:07:37.661114Z"
+    },
+    {
+      "seed": 4,
+      "winner": "A",
+      "damage_dealt_a": 77.92,
+      "damage_dealt_b": 31.07,
+      "steps_survived_a": 58,
+      "steps_survived_b": 63,
+      "score_a": 77.9179,
+      "score_b": 31.0741,
+      "terminated": false,
+      "timestamp": "2026-07-29T20:07:38.661894Z"
+    },
+    {
+      "seed": 5,
+      "winner": "B",
+      "damage_dealt_a": 12.84,
+      "damage_dealt_b": 58.81,
+      "steps_survived_a": 54,
+      "steps_survived_b": 66,
+      "score_a": 12.8394,
+      "score_b": 58.8102,
+      "terminated": false,
+      "timestamp": "2026-07-29T20:07:39.566109Z"
+    }
+  ],
+  "aggregate": {
+    "overall_winner": null,
+    "confidence": 0.4,
+    "seeds_won_a": 2,
+    "seeds_won_b": 1,
+    "draws": 2,
+    "total_damage_a": 194.35,
+    "total_damage_b": 181.19,
+    "damage_gate_passed": true,
+    "gate_note": ""
+  },
+  "started_at": "2026-07-29T20:07:33.970530Z",
+  "completed_at": "2026-07-29T20:07:39.579470Z",
+  "payload_sha256": "b0e135c62edd3eb08006059134ec3eafb4891fb57084010f827993fa23dd431c",
+  "hmac_sha256": "",
+  "signed_at": "2026-07-29T20:07:39.579891Z"
+}
