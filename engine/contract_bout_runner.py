@@ -38,29 +38,27 @@ _SCENE = os.environ.get(
     os.path.join(_HERE, "assets", "scene_2bot_mjlab.xml"),
 )
 
-# Contract constants (docs/policy-contract.md Appendix A/B)
-JOINT_NAMES_23 = [
+# Contract constants (docs/policy-contract.md Appendix A/B) — contract v2, 29-DoF
+JOINT_NAMES_29 = [
     "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
     "left_knee_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
     "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
     "right_knee_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint",
     "waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint",
     "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint",
-    "left_elbow_joint",
+    "left_elbow_joint", "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
     "right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint",
-    "right_elbow_joint",
+    "right_elbow_joint", "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
 ]
-WRIST_JOINTS = [
-    "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
-    "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
-]
-DEFAULT_POSE_23 = np.array([
+DEFAULT_POSE_29 = np.array([
     -0.20, 0.0, 0.0, 0.50, -0.30, 0.0,
     -0.20, 0.0, 0.0, 0.50, -0.30, 0.0,
     0.0, 0.0, 0.0,
-    0.20, 0.20, 0.0, 0.9,
-    0.20, -0.20, 0.0, 0.9,
+    0.20, 0.20, 0.0, 0.9, 0.0, 0.0, 0.0,
+    0.20, -0.20, 0.0, 0.9, 0.0, 0.0, 0.0,
 ], dtype=np.float32)
+OBS_DIM = 73
+ACT_DIM = 29
 
 KO_HP = 0.0
 FALL_Z = 0.4
@@ -81,7 +79,7 @@ class _SandbagPolicy:
     """Stand-still in guard pose (the v0 baseline)."""
 
     def predict(self, obs: np.ndarray) -> np.ndarray:
-        return DEFAULT_POSE_23.copy()
+        return DEFAULT_POSE_29.copy()
 
 
 def load_policy(spec: str) -> Any:
@@ -135,21 +133,14 @@ class _Robot:
         self.qpos_adr = model.jnt_qposadr[self.free_jnt]
         self.qvel_adr = model.jnt_dofadr[self.free_jnt]
         self.ctrl_qpos = np.array(
-            [model.jnt_qposadr[jid(f"{prefix}{n}")] for n in JOINT_NAMES_23]
+            [model.jnt_qposadr[jid(f"{prefix}{n}")] for n in JOINT_NAMES_29]
         )
         self.ctrl_qvel = np.array(
-            [model.jnt_dofadr[jid(f"{prefix}{n}")] for n in JOINT_NAMES_23]
+            [model.jnt_dofadr[jid(f"{prefix}{n}")] for n in JOINT_NAMES_29]
         )
         self.act_adr = np.array(
             [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix}{n}")
-             for n in JOINT_NAMES_23]
-        )
-        self.wrist_act_adr = np.array(
-            [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{prefix}{n}")
-             for n in WRIST_JOINTS]
-        )
-        self.wrist_qpos = np.array(
-            [model.jnt_qposadr[jid(f"{prefix}{n}")] for n in WRIST_JOINTS]
+             for n in JOINT_NAMES_29]
         )
         self.pelvis = bid(f"{prefix}pelvis")
         self.torso = bid(f"{prefix}torso_link")
@@ -164,7 +155,7 @@ class _Robot:
         ang_vel_b = data.qvel[self.qvel_adr + 3:self.qvel_adr + 6].astype(np.float32)
         jp = data.qpos[self.ctrl_qpos].astype(np.float32)
         jv = data.qvel[self.ctrl_qvel].astype(np.float32)
-        jp_rel = jp - DEFAULT_POSE_23
+        jp_rel = jp - DEFAULT_POSE_29
         off_l = rot.T @ (data.xpos[opp.torso] - data.xpos[self.lfist])
         off_r = rot.T @ (data.xpos[opp.torso] - data.xpos[self.rfist])
         def_l = rot.T @ (data.xpos[opp.pelvis] - data.xpos[self.torso])
@@ -266,8 +257,8 @@ class ContractBoutRunner:
         sep_jitter = rng.uniform(-0.05, 0.05)
         lat_a, lat_b = rng.uniform(-0.05, 0.05, 2)
         yaw_a, yaw_b = rng.uniform(-0.1745, 0.1745, 2)  # ±10 deg
-        joint_jitter_a = rng.uniform(-0.02, 0.02, 23)
-        joint_jitter_b = rng.uniform(-0.02, 0.02, 23)
+        joint_jitter_a = rng.uniform(-0.02, 0.02, 29)
+        joint_jitter_b = rng.uniform(-0.02, 0.02, 29)
 
         def _yaw_quat(yaw: float, flip: bool) -> tuple:
             # rotation about Z by yaw, plus 180-deg flip for robot B
@@ -282,8 +273,7 @@ class ContractBoutRunner:
             data.qpos[rb.qpos_adr:rb.qpos_adr + 3] = [
                 sign * (SEPARATION + sep_jitter) / 2, lat, SPAWN_Z]
             data.qpos[rb.qpos_adr + 3:rb.qpos_adr + 7] = quat
-            data.qpos[rb.ctrl_qpos] = DEFAULT_POSE_23 + jj
-            data.qpos[rb.wrist_qpos] = 0.0
+            data.qpos[rb.ctrl_qpos] = DEFAULT_POSE_29 + jj
         mujoco.mj_forward(model, data)
 
         policy_a = load_policy(policy_a_path)
@@ -318,8 +308,6 @@ class ContractBoutRunner:
 
             data.ctrl[A.act_adr] = act_a
             data.ctrl[B.act_adr] = act_b
-            data.ctrl[A.wrist_act_adr] = 0.0
-            data.ctrl[B.wrist_act_adr] = 0.0
 
             for _ in range(DECIM):
                 mujoco.mj_step(model, data)
