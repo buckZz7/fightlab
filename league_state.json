@@ -29,11 +29,31 @@
         "assets/fights/fl01/seed5.mp4"
       ],
       "seed_results": [
-        {"seed": 1, "outcome": "draw", "damage": "36.3-39.3"},
-        {"seed": 2, "outcome": "champion", "damage": "35.6-15.4"},
-        {"seed": 3, "outcome": "draw", "damage": "31.7-36.6"},
-        {"seed": 4, "outcome": "champion", "damage": "77.9-31.1"},
-        {"seed": 5, "outcome": "challenger", "damage": "12.8-58.8"}
+        {
+          "seed": 1,
+          "outcome": "draw",
+          "damage": "36.3-39.3"
+        },
+        {
+          "seed": 2,
+          "outcome": "champion",
+          "damage": "35.6-15.4"
+        },
+        {
+          "seed": 3,
+          "outcome": "draw",
+          "damage": "31.7-36.6"
+        },
+        {
+          "seed": 4,
+          "outcome": "champion",
+          "damage": "77.9-31.1"
+        },
+        {
+          "seed": 5,
+          "outcome": "challenger",
+          "damage": "12.8-58.8"
+        }
       ]
     }
   ],
@@ -49,6 +69,12 @@
       "policy": "sandbag",
       "status": "baseline",
       "submitted_at": "2026-07-29"
+    },
+    {
+      "name": "V6",
+      "policy": "submissions/v6",
+      "status": "in training",
+      "submitted_at": "2026-07-30"
     }
   ]
 }
